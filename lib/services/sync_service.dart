@@ -1,0 +1,189 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hive/hive.dart';
+import '../models/name_model.dart';
+import 'api_service.dart';
+
+class SyncService {
+  static const String _namesBoxName = 'names';
+
+  /// Initialize the sync service and open Hive boxes
+  static Future<void> initialize() async {
+    await Hive.openBox<NameModel>(_namesBoxName);
+  }
+
+  /// Check if device is online
+  static Future<bool> isOnline() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
+  /// Sync all unsynced names to the backend
+  static Future<void> syncNames() async {
+    final isOnline = await SyncService.isOnline();
+    if (!isOnline) {
+      print("📴 Offline — data will sync later.");
+      return;
+    }
+
+    print("🔁 Syncing unsynced names...");
+    
+    // Test backend connection first
+    await ApiService.testConnection();
+    await ApiService.testNamesEndpoint();
+    
+    final box = Hive.box<NameModel>(_namesBoxName);
+    
+    for (var name in box.values.where((n) => !n.synced)) {
+      try {
+        final response = await ApiService.sendName(name);
+        if (response != null) {
+          // Update the name with server ID and mark as synced
+          name.serverId = response['id']?.toString();
+          name.synced = true;
+          await name.save();
+          print("✅ Synced: ${name.displayName}");
+        } else {
+          print("❌ Failed to sync: ${name.displayName}");
+        }
+      } catch (e) {
+        print("❌ Error syncing ${name.displayName}: $e");
+      }
+    }
+  }
+
+  /// Pull latest data from backend and merge with local data
+  static Future<void> pullFromBackend() async {
+    final isOnline = await SyncService.isOnline();
+    if (!isOnline) {
+      print("📴 Offline — cannot pull from backend.");
+      return;
+    }
+
+    print("📥 Pulling latest data from backend...");
+    try {
+      final serverNames = await ApiService.fetchNames();
+      final box = Hive.box<NameModel>(_namesBoxName);
+      
+      // Create a map of existing names by server ID for quick lookup
+      final existingNames = <String, NameModel>{};
+      for (var name in box.values) {
+        if (name.serverId != null) {
+          existingNames[name.serverId!] = name;
+        }
+      }
+
+      // Process server data
+      for (var serverName in serverNames) {
+        if (serverName.serverId != null) {
+          final existing = existingNames[serverName.serverId!];
+          if (existing == null) {
+            // New name from server - add it
+            await box.add(serverName);
+            print("📥 Added new name from server: ${serverName.displayName}");
+          } else {
+            // Update existing name if server version is newer
+            if (serverName.createdAt.isAfter(existing.createdAt)) {
+              existing.displayName = serverName.displayName;
+              existing.group = serverName.group;
+              existing.phone = serverName.phone;
+              existing.gstin = serverName.gstin;
+              existing.commissionPercent = serverName.commissionPercent;
+              existing.synced = true;
+              await existing.save();
+              print("🔄 Updated name from server: ${serverName.displayName}");
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("❌ Error pulling from backend: $e");
+    }
+  }
+
+  /// Add a new name locally and attempt to sync
+  static Future<void> addName(NameModel name) async {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    await box.add(name);
+    
+    // Try to sync immediately if online
+    await syncNames();
+  }
+
+  /// Update an existing name and sync to backend
+  static Future<void> updateName(NameModel name) async {
+    await name.save();
+    
+    // If it has a server ID, try to sync to backend
+    if (name.serverId != null) {
+      final isOnline = await SyncService.isOnline();
+      if (isOnline) {
+        final success = await ApiService.updateName(name);
+        if (success) {
+          name.synced = true;
+          await name.save();
+        }
+      }
+    } else {
+      // If no server ID, it's a local change that needs to be synced
+      await syncNames();
+    }
+  }
+
+  /// Delete a name locally and from backend
+  static Future<void> deleteName(NameModel name) async {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    
+    // If it has a server ID, delete from backend first
+    if (name.serverId != null) {
+      final isOnline = await SyncService.isOnline();
+      if (isOnline) {
+        final success = await ApiService.deleteName(name.serverId!);
+        if (success) {
+          await name.delete();
+          print("🗑️ Deleted name from server: ${name.displayName}");
+        } else {
+          print("❌ Failed to delete from server: ${name.displayName}");
+        }
+      } else {
+        // Mark for deletion when online
+        name.synced = false; // This will trigger a re-sync attempt
+        await name.save();
+        await name.delete();
+      }
+    } else {
+      // Local only - just delete
+      await name.delete();
+    }
+  }
+
+  /// Get all names from local storage
+  static List<NameModel> getAllNames() {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    return box.values.toList();
+  }
+
+  /// Get names by group
+  static List<NameModel> getNamesByGroup(String group) {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    return box.values.where((name) => name.group.toLowerCase() == group.toLowerCase()).toList();
+  }
+
+  /// Clear all local data
+  static Future<void> clearAllData() async {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    await box.clear();
+    print("🗑️ Cleared all local data");
+  }
+
+  /// Get sync status summary
+  static Map<String, int> getSyncStatus() {
+    final box = Hive.box<NameModel>(_namesBoxName);
+    final allNames = box.values.toList();
+    
+    return {
+      'total': allNames.length,
+      'synced': allNames.where((n) => n.synced).length,
+      'pending': allNames.where((n) => !n.synced).length,
+    };
+  }
+}
