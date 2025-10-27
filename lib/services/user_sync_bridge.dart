@@ -1,3 +1,4 @@
+import 'package:hive/hive.dart';
 import '../models/user_model.dart';
 import '../models/name_model.dart';
 import '../data/user_data.dart';
@@ -56,50 +57,122 @@ class UserSyncBridge {
     return names.map((name) => nameToUser(name)).toList();
   }
 
-  /// Add a user to both UserData and sync system
+  /// Add a user to both UserData and sync system (OPTIMIZED)
   static Future<void> addUser(UserModel user) async {
-    // Add to existing UserData
-    UserData.addUser(user);
-    
-    // Add to sync system
-    final name = userToName(user);
-    await SyncService.addName(name);
+    try {
+      print('🔄 UserSyncBridge: Adding user ${user.name}');
+      
+      // Add to existing UserData (fast local operation)
+      UserData.addUser(user);
+      print('✅ UserSyncBridge: Added to UserData');
+      
+      // Optimized: Direct Hive box access for faster operations
+      final box = await Hive.openBox<NameModel>('names');
+      final name = userToName(user);
+      print('🔄 UserSyncBridge: Converting to NameModel: ${name.displayName}');
+      
+      await box.add(name);
+      print('✅ UserSyncBridge: Added to sync system');
+      
+    } catch (e) {
+      print('❌ UserSyncBridge: Error adding user: $e');
+      rethrow;
+    }
   }
 
-  /// Update a user in both UserData and sync system
+  /// Update a user in both UserData and sync system (OPTIMIZED)
   static Future<void> updateUser(UserModel user) async {
-    // Update in existing UserData
-    UserData.updateUser(user);
-    
-    // Find corresponding name in sync system and update
-    final names = SyncService.getAllNames();
-    final matchingName = names.firstWhere(
-      (name) => name.displayName == user.name && name.group == user.role,
-      orElse: () => userToName(user),
-    );
-    
-    matchingName.displayName = user.name;
-    matchingName.group = user.role;
-    matchingName.phone = user.phoneNumber;
-    matchingName.gstin = user.gstNumber;
-    
-    await SyncService.updateName(matchingName);
+    try {
+      print('🔄 UserSyncBridge: Updating user ${user.name}');
+      
+      // Update in existing UserData (fast local operation)
+      UserData.updateUser(user);
+      print('✅ UserSyncBridge: Updated in UserData');
+      
+      // Optimized: Direct Hive box access for faster operations
+      final box = await Hive.openBox<NameModel>('names');
+      NameModel? matchingName;
+      
+      // Try to find by user ID first (most reliable) - optimized search
+      try {
+        matchingName = box.values.firstWhere(
+          (name) => name.serverId == user.id || 
+                    name.createdAt.millisecondsSinceEpoch.toString() == user.id,
+        );
+        print('✅ UserSyncBridge: Found existing name by ID');
+      } catch (e) {
+        // If not found by ID, try by name and role - optimized search
+        try {
+          matchingName = box.values.firstWhere(
+            (name) => name.displayName == user.name && name.group == user.role,
+          );
+          print('✅ UserSyncBridge: Found existing name by name/role');
+        } catch (e) {
+          print('⚠️ UserSyncBridge: No existing name found, creating new one');
+          // If no matching name found, create a new one and add it
+          final newName = userToName(user);
+          await box.add(newName);
+          print('✅ UserSyncBridge: Added new name to sync system');
+          return; // Exit early since we just added a new name
+        }
+      }
+      
+      // Update the existing name (optimized - no unnecessary sync)
+      if (matchingName != null) {
+        matchingName.displayName = user.name;
+        matchingName.group = user.role;
+        matchingName.phone = user.phoneNumber;
+        matchingName.gstin = user.gstNumber;
+        
+        // Direct save without triggering full sync
+        await matchingName.save();
+        print('✅ UserSyncBridge: Updated existing name in sync system');
+        
+        // Mark as unsynced for background sync (non-blocking)
+        matchingName.synced = false;
+        await matchingName.save();
+        print('🔄 UserSyncBridge: Marked for background sync');
+      }
+      
+    } catch (e) {
+      print('❌ UserSyncBridge: Error updating user: $e');
+      rethrow;
+    }
   }
 
-  /// Remove a user from both UserData and sync system
+  /// Remove a user from both UserData and sync system (OPTIMIZED)
   static Future<void> removeUser(String userId) async {
-    // Remove from existing UserData
-    UserData.removeUser(userId);
-    
-    // Find and remove from sync system
-    final names = SyncService.getAllNames();
-    final matchingName = names.firstWhere(
-      (name) => name.serverId == userId || 
-                name.createdAt.millisecondsSinceEpoch.toString() == userId,
-      orElse: () => throw Exception('User not found in sync system'),
-    );
-    
-    await SyncService.deleteName(matchingName);
+    try {
+      print('🔄 UserSyncBridge: Removing user $userId');
+      
+      // Remove from existing UserData (fast local operation)
+      UserData.removeUser(userId);
+      print('✅ UserSyncBridge: Removed from UserData');
+      
+      // Optimized: Direct Hive box access for faster operations
+      final box = await Hive.openBox<NameModel>('names');
+      NameModel? matchingName;
+      
+      try {
+        matchingName = box.values.firstWhere(
+          (name) => name.serverId == userId || 
+                    name.createdAt.millisecondsSinceEpoch.toString() == userId,
+        );
+        print('✅ UserSyncBridge: Found name to remove');
+        
+        // Direct delete without triggering full sync
+        await matchingName.delete();
+        print('✅ UserSyncBridge: Removed from sync system');
+        
+      } catch (e) {
+        print('⚠️ UserSyncBridge: No matching name found in sync system: $e');
+        // Continue anyway since the user was removed from UserData
+      }
+      
+    } catch (e) {
+      print('❌ UserSyncBridge: Error removing user: $e');
+      rethrow;
+    }
   }
 
   /// Clear all users from both systems
@@ -113,10 +186,17 @@ class UserSyncBridge {
     return SyncService.getSyncStatus();
   }
 
-  /// Force sync all pending changes
+  /// Force sync all pending changes (background operation)
   static Future<void> forceSync() async {
-    await SyncService.syncNames();
-    await SyncService.pullFromBackend();
+    try {
+      print('🔄 UserSyncBridge: Starting background sync');
+      await SyncService.syncNames();
+      await SyncService.pullFromBackend();
+      print('✅ UserSyncBridge: Background sync completed');
+    } catch (e) {
+      print('❌ UserSyncBridge: Background sync failed: $e');
+      // Don't rethrow - background sync failures shouldn't crash the app
+    }
   }
 
   // Helper methods

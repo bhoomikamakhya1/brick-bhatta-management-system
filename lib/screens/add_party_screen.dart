@@ -50,29 +50,56 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   }
 
   Future<void> _onSave() async {
-    if (!_formKey.currentState!.validate()) return;
-    // Build a lightweight user entry for the Ledger list
-    final name = _nameController.text.trim();
-    final group = _selectedGroup ?? 'General';
-    final role = _toRole(group);
-    final roleHi = _toHindi(group);
-    final initials = _computeInitials(name);
-    final newUser = UserModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      nameHindi: name, // for now mirror name
-      role: role,
-      roleHindi: roleHi,
-      initials: initials,
-      isActive: true,
-    );
-    // Add to both UserData and sync system
-    await UserSyncBridge.addUser(newUser);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Party saved and synced'), backgroundColor: Colors.green),
-    );
-    Navigator.of(context).pop();
+    try {
+      print('🔍 Starting save process...');
+      
+      // Validate form first
+      if (!_formKey.currentState!.validate()) {
+        print('❌ Form validation failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill all required fields'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      
+      print('✅ Form validation passed');
+      
+      // Build a lightweight user entry for the Ledger list
+      final name = _nameController.text.trim();
+      final group = _selectedGroup ?? 'General';
+      final role = _toRole(group);
+      final roleHi = _toHindi(group);
+      final initials = _computeInitials(name);
+      
+      print('📝 Creating user: $name, Group: $group, Role: $role');
+      
+      final newUser = UserModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name,
+        nameHindi: name, // for now mirror name
+        role: role,
+        roleHindi: roleHi,
+        initials: initials,
+        isActive: true,
+      );
+      
+      print('👤 User model created: ${newUser.name}');
+      
+      // Add to both UserData and sync system
+      await UserSyncBridge.addUser(newUser);
+      
+      print('✅ User added successfully');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Party saved and synced'), backgroundColor: Colors.green),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      print('❌ Error saving party: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving party: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   InputDecoration _inputDecoration({String? hint, Widget? suffixIcon}) {
@@ -357,7 +384,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _onSave,
+                      onPressed: () {
+                        print('🔘 Save button pressed');
+                        _onSave();
+                        Navigator.pop(context);
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF8B4513),
                         foregroundColor: Colors.white,

@@ -3,7 +3,8 @@ import '../models/dashboard_model.dart';
 import '../widgets/user_header.dart';
 import '../widgets/overview_card.dart';
 import '../widgets/quick_action_button.dart';
-import 'add_labour_work_screen.dart';
+import 'work_type_selection_screen.dart';
+import 'add_sale_screen.dart';
 import 'commission_entry_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -124,7 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const AddLabourWorkScreen(),
+                            builder: (context) => const WorkTypeSelectionScreen(),
                           ),
                         );
                       },
@@ -134,7 +135,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       titleHindi: 'बिक्री जोड़े',
                       icon: Icons.shopping_cart,
                       onTap: () {
-                        _showComingSoonDialog('Add Sale');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AddSaleScreen(),
+                          ),
+                        );
                       },
                     ),
                     QuickActionButton(

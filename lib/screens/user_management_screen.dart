@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../data/user_data.dart';
+import 'add_user_screen.dart';
 import '../widgets/user_card.dart';
 import '../widgets/stats_card.dart';
 import '../widgets/filter_chip.dart';
@@ -108,9 +109,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "add_user_fab",
         onPressed: () {
-          // TODO: Navigate to add user screen
-          _showAddUserDialog();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddUserScreen(),
+            ),
+          );
         },
         backgroundColor: const Color(0xFFFF9800),
         child: const Icon(Icons.add, color: Colors.white),
@@ -146,22 +152,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             Text('Status: ${user.isActive ? 'Active' : 'Inactive'}'),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddUserDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New User'),
-        content: const Text('Add user functionality will be implemented here.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

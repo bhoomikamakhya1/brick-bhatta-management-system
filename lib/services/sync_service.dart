@@ -102,30 +102,61 @@ class SyncService {
 
   /// Add a new name locally and attempt to sync
   static Future<void> addName(NameModel name) async {
-    final box = Hive.box<NameModel>(_namesBoxName);
-    await box.add(name);
-    
-    // Try to sync immediately if online
-    await syncNames();
+    try {
+      print('🔄 SyncService: Adding name ${name.displayName}');
+      
+      final box = Hive.box<NameModel>(_namesBoxName);
+      await box.add(name);
+      print('✅ SyncService: Added to local storage');
+      
+      // Try to sync immediately if online
+      await syncNames();
+      print('✅ SyncService: Sync attempt completed');
+      
+    } catch (e) {
+      print('❌ SyncService: Error adding name: $e');
+      rethrow;
+    }
   }
 
   /// Update an existing name and sync to backend
   static Future<void> updateName(NameModel name) async {
-    await name.save();
-    
-    // If it has a server ID, try to sync to backend
-    if (name.serverId != null) {
-      final isOnline = await SyncService.isOnline();
-      if (isOnline) {
-        final success = await ApiService.updateName(name);
-        if (success) {
-          name.synced = true;
-          await name.save();
-        }
+    try {
+      print('🔄 SyncService: Updating name ${name.displayName}');
+      
+      // Check if the name is properly associated with a box
+      if (!name.isInBox) {
+        print('⚠️ SyncService: Name not in box, skipping update');
+        return;
       }
-    } else {
-      // If no server ID, it's a local change that needs to be synced
-      await syncNames();
+      
+      await name.save();
+      print('✅ SyncService: Saved name locally');
+      
+      // If it has a server ID, try to sync to backend
+      if (name.serverId != null) {
+        final isOnline = await SyncService.isOnline();
+        if (isOnline) {
+          final success = await ApiService.updateName(name);
+          if (success) {
+            name.synced = true;
+            await name.save();
+            print('✅ SyncService: Synced to backend');
+          } else {
+            print('⚠️ SyncService: Failed to sync to backend');
+          }
+        } else {
+          print('📴 SyncService: Offline, will sync later');
+        }
+      } else {
+        // If no server ID, it's a local change that needs to be synced
+        print('🔄 SyncService: No server ID, attempting sync');
+        await syncNames();
+      }
+      
+    } catch (e) {
+      print('❌ SyncService: Error updating name: $e');
+      rethrow;
     }
   }
 

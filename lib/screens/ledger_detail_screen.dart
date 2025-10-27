@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
+import '../services/user_sync_bridge.dart';
 
 class LedgerDetailScreen extends StatefulWidget {
   final UserModel user;
@@ -39,6 +40,10 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'Ledger Detail',
           style: TextStyle(
@@ -48,88 +53,47 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFF8B4513),
+        backgroundColor: const Color(0xFFFF6F00),
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _headerCard(),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             _infoSection(
               title: 'Basic Information',
               children: [
-                _readonlyField('Name', user.name),
-                _readonlyField('Name (Hindi)', user.nameHindi),
-                _readonlyField('Role', user.role),
-                _readonlyField('Status', user.isActive ? 'Active' : 'Inactive'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _infoSection(
-              title: 'Payment Details',
-              children: [
-                _readonlyField('Commission Rate', '—'),
-                _readonlyField('Total Earned', '—'),
-                _readonlyField('Pending Amount', '—'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _infoSection(
-              title: 'Date Information',
-              children: [
-                _readonlyField('Join Date', '—'),
-                _readonlyField('Last Payment', '—'),
+                _readonlyField('Group / समूह', _getGroupName()),
+                _readonlyField('Status / स्थिति', user.isActive ? 'सक्रिय (Active)' : 'निष्क्रिय (Inactive)', 
+                    valueColor: user.isActive ? const Color(0xFF4CAF50) : const Color(0xFFF44336)),
+                _readonlyField('Type / प्रकार', _getTypeDisplay()),
               ],
             ),
             const SizedBox(height: 16),
-            Row(
+            _infoSection(
+              title: 'Payment Details',
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => _EditPartyScreen(user: user),
-                        ),
-                      );
-                      if (!mounted) return;
-                      if (result is UserModel) {
-                        setState(() {
-                          user = result;
-                        });
-                        // Also bubble the change back to previous list screen
-                        Navigator.of(context).pop<UserModel>(result);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B4513),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.edit, size: 18),
-                    label: const Text('Edit Details'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD32F2F),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.delete, size: 18),
-                    label: const Text('Delete'),
-                  ),
-                ),
+                _readonlyField('Commission Rate / कमीशन दर', '₹15 per 1000 bricks', 
+                    valueColor: const Color(0xFFF44336)),
+                _readonlyField('Total Earned / कुल कमाई', '₹12,450', 
+                    valueColor: const Color(0xFF4CAF50)),
+                _readonlyField('Pending Amount / बकाया राशि', '₹2,300', 
+                    valueColor: const Color(0xFFF44336)),
               ],
             ),
+            const SizedBox(height: 16),
+            _infoSection(
+              title: 'Date Information',
+              children: [
+                _readonlyField('Join Date / शामिल होने की तारीख', '15 Jan 2024'),
+                _readonlyField('Last Payment / अंतिम भुगतान', '28 Feb 2024'),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _actionButtons(),
           ],
         ),
       ),
@@ -144,13 +108,10 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: const Color(0xFFFFCC80),
-              child: Text(
-                user.initials,
-                style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF6D4C41)),
-              ),
+            const Icon(
+              Icons.person,
+              size: 32,
+              color: Color(0xFF666666),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -159,27 +120,27 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
                 children: [
                   Text(
                     user.nameHindi,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     user.name,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
                   ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: user.isActive ? const Color(0xFFE8F5E9) : const Color(0xFFFBE9E7),
+                color: const Color(0xFF4CAF50),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                user.isActive ? 'Active' : 'Inactive',
+              child: const Text(
+                'Active',
                 style: TextStyle(
-                  color: user.isActive ? const Color(0xFF2E7D32) : const Color(0xFFBF360C),
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
               ),
@@ -211,7 +172,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
     );
   }
 
-  Widget _readonlyField(String label, String value) {
+  Widget _readonlyField(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -230,10 +191,202 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
               border: Border.all(color: const Color(0xFFE0E0E0)),
             ),
             child: Text(value.isEmpty ? '—' : value,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF333333))),
+                style: TextStyle(fontSize: 14, color: valueColor ?? const Color(0xFF333333))),
           ),
         ],
       ),
+    );
+  }
+
+  String _getGroupName() {
+    switch (user.role.toLowerCase()) {
+      case 'labour':
+        return 'मजदूर ग्रुप A';
+      case 'thekedaar':
+        return 'ठेकेदार ग्रुप B';
+      case 'employee':
+        return 'कर्मचारी ग्रुप C';
+      case 'sale':
+        return 'बिक्री ग्रुप D';
+      default:
+        return '${user.role} Group';
+    }
+  }
+
+  String _getTypeDisplay() {
+    switch (user.role.toLowerCase()) {
+      case 'labour':
+      case 'thekedaar':
+        return 'Commission Based';
+      case 'employee':
+        return 'Salary Based';
+      case 'sale':
+        return 'Commission Based';
+      default:
+        return 'General';
+    }
+  }
+
+  Widget _actionButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _EditPartyScreen(user: user),
+                ),
+              );
+              if (!mounted) return;
+              if (result is UserModel) {
+                try {
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  // Update user in both local storage and database
+                  await UserSyncBridge.updateUser(result);
+                  
+                  // Close loading dialog
+                  if (mounted) Navigator.of(context).pop();
+                  
+                  // Update local state
+                  setState(() {
+                    user = result;
+                  });
+                  
+                  // Show success message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${result.name} details updated successfully'),
+                        backgroundColor: const Color(0xFF4CAF50),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                  
+                  // Return updated user to previous screen
+                  Navigator.of(context).pop<UserModel>(result);
+                  
+                } catch (e) {
+                  // Close loading dialog if still open
+                  if (mounted) Navigator.of(context).pop();
+                  
+                  // Show error message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to update: ${e.toString()}'),
+                        backgroundColor: const Color(0xFFF44336),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6F00),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.edit, size: 18),
+            label: const Text('Edit Details / विवरण संपादित करें'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Party'),
+                  content: Text('Are you sure you want to delete ${user.name}?\n\nThis action cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFFF44336)),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                try {
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  // Remove user from both local storage and database
+                  await UserSyncBridge.removeUser(user.id);
+                  
+                  // Close loading dialog
+                  if (mounted) Navigator.of(context).pop();
+                  
+                  // Show success message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${user.name} deleted successfully'),
+                        backgroundColor: const Color(0xFF4CAF50),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                  
+                  // Return to previous screen
+                  Navigator.of(context).pop();
+                  
+                } catch (e) {
+                  // Close loading dialog if still open
+                  if (mounted) Navigator.of(context).pop();
+                  
+                  // Show error message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to delete: ${e.toString()}'),
+                        backgroundColor: const Color(0xFFF44336),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD32F2F),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.delete, size: 18),
+            label: const Text('Delete / हटाएं'),
+          ),
+        ),
+      ],
     );
   }
 }

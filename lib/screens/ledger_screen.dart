@@ -128,7 +128,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       body: Column(
         children: [
           // Sync Status Widget
-          const SyncStatusWidget(),
+          // const SyncStatusWidget(),
           
           // Search
           Padding(
@@ -203,6 +203,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "add_party_fab",
         onPressed: () {
           Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => const AddPartyScreen()))
@@ -321,8 +322,7 @@ class _LedgerListItem extends StatelessWidget {
               )
               .then((result) async {
             if (result is UserModel) {
-              // When edit returns an updated user, refresh both systems
-              await UserSyncBridge.updateUser(result);
+              // User was updated in the detail screen, just refresh the UI
               onUpdated?.call();
             }
           });
