@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../constants/string_constants.dart';
 import '../models/labour_work_model.dart';
+import '../services/work_data_service.dart';
 import '../widgets/custom_dropdown.dart';
 import '../widgets/form_text_field.dart';
 import '../widgets/category_chip.dart';
-import '../widgets/bottom_navigation.dart';
 
 class AddLabourWorkScreen extends StatefulWidget {
   final String? workType;
@@ -104,7 +105,7 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
         title: Text(
           widget.workType != null 
             ? 'Add ${widget.workType} Work'
-            : 'Add Labour Work',
+            : StringConstants.getBilingual(StringConstants.addLabourWork, StringConstants.addLabourWorkHindi),
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -456,15 +457,57 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
       }
     }
 
-    // TODO: Save labour work entry
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Labour work saved successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    try {
+      // Create work entry based on work type
+      final workEntry = _createWorkEntry();
+      
+      // Save to work data service
+      WorkDataService.addWorkEntry(workEntry);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${widget.workType ?? 'Labour'} work saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
 
-    // Clear form
+      // Clear form
+      _clearForm();
+      
+      // Navigate back to work list
+      Navigator.pop(context, workEntry);
+      
+    } catch (e) {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving work: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  LabourWork _createWorkEntry() {
+    final workType = widget.workType ?? 'General';
+    final workQuantity = widget.workType == 'Nikasi' ? totalQuantity : quantity;
+    final workAmount = widget.workType == 'Nikasi' ? amount : totalAmount;
+    final workRate = widget.workType == 'Nikasi' ? 2.0 : rate; // ₹2 per piece for Nikasi
+
+    return LabourWork(
+      id: WorkDataService.generateId(),
+      labourName: selectedLabour!,
+      labourCategory: workType,
+      quantity: workQuantity,
+      percentage: percentage,
+      rate: workRate,
+      totalAmount: workAmount,
+      date: DateTime.now(),
+    );
+  }
+
+  void _clearForm() {
     setState(() {
       selectedLabour = null;
       selectedCategory = null;

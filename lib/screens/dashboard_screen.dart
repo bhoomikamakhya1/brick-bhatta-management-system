@@ -8,7 +8,9 @@ import 'add_sale_screen.dart';
 import 'commission_entry_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final VoidCallback? onNavigateToReports;
+  
+  const DashboardScreen({super.key, this.onNavigateToReports});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -161,7 +163,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       titleHindi: 'रिपोर्ट',
                       icon: Icons.assessment,
                       onTap: () {
-                        _showComingSoonDialog('Reports');
+                        if (widget.onNavigateToReports != null) {
+                          widget.onNavigateToReports!();
+                        } else {
+                          _showComingSoonDialog('Reports');
+                        }
                       },
                     ),
                   ],

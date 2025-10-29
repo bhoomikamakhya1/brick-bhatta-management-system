@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/string_constants.dart';
 import 'add_labour_work_screen.dart';
 
 class WorkTypeSelectionScreen extends StatelessWidget {
@@ -9,9 +10,9 @@ class WorkTypeSelectionScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text(
-          'Select Work Type',
-          style: TextStyle(
+        title: Text(
+          StringConstants.getBilingual(StringConstants.selectWorkType, StringConstants.selectWorkTypeHindi),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -58,39 +59,39 @@ class WorkTypeSelectionScreen extends StatelessWidget {
                 children: [
                   _buildWorkTypeCard(
                     context: context,
-                    title: 'Pathai',
-                    titleHindi: 'पठाई',
-                    description: 'Loading and unloading work',
-                    descriptionHindi: 'लोडिंग और अनलोडिंग का काम',
+                    title: StringConstants.pathai,
+                    titleHindi: StringConstants.pathaiHindi,
+                    description: StringConstants.pathaiDescription,
+                    descriptionHindi: StringConstants.pathaiDescriptionHindi,
                     icon: Icons.upload,
                     color: const Color(0xFF2196F3),
-                    workType: 'Pathai',
+                    workType: StringConstants.pathai,
                   ),
                   
                   const SizedBox(height: 16),
                   
                   _buildWorkTypeCard(
                     context: context,
-                    title: 'Bharai',
-                    titleHindi: 'भराई',
-                    description: 'Filling and packing work',
-                    descriptionHindi: 'भराई और पैकिंग का काम',
+                    title: StringConstants.bharai,
+                    titleHindi: StringConstants.bharaiHindi,
+                    description: StringConstants.bharaiDescription,
+                    descriptionHindi: StringConstants.bharaiDescriptionHindi,
                     icon: Icons.inventory,
                     color: const Color(0xFF4CAF50),
-                    workType: 'Bharai',
+                    workType: StringConstants.bharai,
                   ),
                   
                   const SizedBox(height: 16),
                   
                   _buildWorkTypeCard(
                     context: context,
-                    title: 'Nikasi',
-                    titleHindi: 'निकासी',
-                    description: 'Unloading and distribution work',
-                    descriptionHindi: 'अनलोडिंग और वितरण का काम',
+                    title: StringConstants.nikasi,
+                    titleHindi: StringConstants.nikasiHindi,
+                    description: StringConstants.nikasiDescription,
+                    descriptionHindi: StringConstants.nikasiDescriptionHindi,
                     icon: Icons.download,
                     color: const Color(0xFFFF9800),
-                    workType: 'Nikasi',
+                    workType: StringConstants.nikasi,
                   ),
                 ],
               ),
@@ -117,13 +118,18 @@ class WorkTypeSelectionScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => AddLabourWorkScreen(workType: workType),
             ),
           );
+          
+          // If work was saved successfully, return the result to the previous screen
+          if (result != null && context.mounted) {
+            Navigator.pop(context, result);
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(

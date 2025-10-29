@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dashboard_screen.dart';
 import 'ledger_screen.dart';
 import 'transactions_screen.dart';
-import 'work_type_selection_screen.dart';
+import 'work_list_screen.dart';
 import 'reports_screen.dart';
 import 'profile_screen.dart';
 
@@ -18,8 +18,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
 
   List<Widget> get _screens => [
-    const DashboardScreen(),
-    const WorkTypeSelectionScreen(),
+    DashboardScreen(onNavigateToReports: () {
+      setState(() {
+        _currentIndex = 4; // Reports tab index
+      });
+    }),
+    const WorkListScreen(),
     const LedgerScreen(),
     const TransactionsScreen(),
     const ReportsScreen(),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/user_data.dart';
 import '../models/user_model.dart';
 import '../services/user_sync_bridge.dart';
 import '../widgets/dialog_selector.dart';
@@ -40,6 +39,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
 
   DateTime? _joiningDate;
   DateTime? _endDate;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -50,6 +50,12 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   }
 
   Future<void> _onSave() async {
+    if (_isSaving) return; // Prevent multiple saves
+    
+    setState(() {
+      _isSaving = true;
+    });
+    
     try {
       print('🔍 Starting save process...');
       
@@ -90,15 +96,27 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
       
       print('✅ User added successfully');
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Party saved and synced'), backgroundColor: Colors.green),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Party saved and synced'), backgroundColor: Colors.green),
+        );
+        
+        // Navigate back after successful save
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       print('❌ Error saving party: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving party: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving party: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -384,10 +402,9 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: _isSaving ? null : () async {
                         print('🔘 Save button pressed');
-                        _onSave();
-                        Navigator.pop(context);
+                        await _onSave();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF8B4513),
@@ -397,7 +414,16 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text('Save / सेव करें', style: TextStyle(fontWeight: FontWeight.w600)),
+                      child: _isSaving 
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text('Save / सेव करें', style: TextStyle(fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(height: 10),

@@ -133,12 +133,12 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
+                color: user.isActive ? const Color(0xFF4CAF50) : const Color(0xFFF44336),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
-                'Active',
-                style: TextStyle(
+              child: Text(
+                user.isActive ? 'Active' : 'Inactive',
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
