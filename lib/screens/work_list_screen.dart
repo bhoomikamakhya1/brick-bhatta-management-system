@@ -348,20 +348,6 @@ class _WorkListScreenState extends State<WorkListScreen> {
                       color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Icon(
-                    Icons.speed,
-                    size: 16,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '₹${work.rate.toInt()}/unit',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -436,7 +422,6 @@ class _WorkListScreenState extends State<WorkListScreen> {
             _buildDetailRow('Quantity', '${work.quantity.toInt()} units'),
             if (work.percentage != null)
               _buildDetailRow('Percentage', '${work.percentage!.toStringAsFixed(1)}%'),
-            _buildDetailRow('Rate', '₹${work.rate.toInt()}/unit'),
             _buildDetailRow('Total Amount', '₹${work.totalAmount.toStringAsFixed(0)}'),
             _buildDetailRow('Date', _formatDate(work.date)),
           ],

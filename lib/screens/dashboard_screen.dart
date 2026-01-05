@@ -3,8 +3,11 @@ import '../models/dashboard_model.dart';
 import '../widgets/user_header.dart';
 import '../widgets/overview_card.dart';
 import '../widgets/quick_action_button.dart';
+import '../services/work_data_service.dart';
+import '../services/sale_data_service.dart';
 import 'work_type_selection_screen.dart';
-import 'add_sale_screen.dart';
+import 'add_party_screen.dart';
+import 'transaction_type_selection_screen.dart';
 import 'commission_entry_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -13,11 +16,65 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.onNavigateToReports});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final DashboardStats stats = DashboardStats.sample();
+class DashboardScreenState extends State<DashboardScreen> {
+  DashboardStats? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  void refreshStats() {
+    _loadStats();
+  }
+
+  void _loadStats() {
+    // Get today's date
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+    final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+
+    // Get today's labour entries
+    final todayWorkEntries = WorkDataService.getTodayWorkEntries();
+    final labourEntries = todayWorkEntries.length;
+
+    // Get today's sales
+    final todaySales = SaleDataService.getSalesByDateRange(startOfDay, endOfDay);
+    final salesToday = todaySales.fold(0.0, (sum, sale) => sum + sale.finalAmount);
+
+    // Calculate payables (debit transactions - expenses, salaries, purchases)
+    // For now, we'll calculate from work entries (labour payments) and purchases
+    // This is a simplified calculation - in a real app, you'd have a transaction service
+    final allWorkEntries = WorkDataService.getAllWorkEntries();
+    final payables = allWorkEntries.fold(0.0, (sum, work) => sum + work.totalAmount);
+
+    // Calculate receivables (credit transactions - sales)
+    // Sum of all sales final amounts
+    final allSales = SaleDataService.getAllSales();
+    final receivables = allSales.fold(0.0, (sum, sale) => sum + sale.finalAmount);
+
+    setState(() {
+      _stats = DashboardStats(
+        labourEntries: labourEntries,
+        salesToday: salesToday,
+        payables: payables,
+        receivables: receivables,
+      );
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload stats when screen becomes visible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStats();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     OverviewCard(
                       title: 'Labour Entries',
                       titleHindi: 'श्रमिक प्रविष्टियां',
-                      value: stats.labourEntries.toString(),
+                      value: _stats?.labourEntries.toString() ?? '0',
                       status: 'Today',
                       icon: Icons.groups,
                       iconColor: Color(0xFF8B4513),
@@ -68,7 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     OverviewCard(
                       title: 'Sales Today',
                       titleHindi: 'आज की बिक्री',
-                      value: '₹${stats.salesToday.toStringAsFixed(0)}',
+                      value: '₹${(_stats?.salesToday ?? 0.0).toStringAsFixed(0)}',
                       status: 'Today',
                       icon: Icons.show_chart,
                       iconColor: Color(0xFF8B4513),
@@ -76,7 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     OverviewCard(
                       title: 'Payables',
                       titleHindi: 'देय राशि',
-                      value: '₹${stats.payables.toStringAsFixed(0)}',
+                      value: '₹${(_stats?.payables ?? 0.0).toStringAsFixed(0)}',
                       status: 'Pending',
                       icon: Icons.arrow_upward,
                       iconColor: Color(0xFF8B4513),
@@ -84,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     OverviewCard(
                       title: 'Receivables',
                       titleHindi: 'प्राप्य राशि',
-                      value: '₹${stats.receivables.toStringAsFixed(0)}',
+                      value: '₹${(_stats?.receivables ?? 0.0).toStringAsFixed(0)}',
                       status: 'Pending',
                       icon: Icons.arrow_downward,
                       iconColor: Colors.green,
@@ -133,14 +190,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       },
                     ),
                     QuickActionButton(
-                      title: 'Add Sale',
-                      titleHindi: 'बिक्री जोड़े',
-                      icon: Icons.shopping_cart,
+                      title: 'Add Party',
+                      titleHindi: 'पार्टी जोड़े',
+                      icon: Icons.person_add,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const AddSaleScreen(),
+                            builder: (context) => const AddPartyScreen(),
                           ),
                         );
                       },
@@ -153,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const CommissionEntryScreen(),
+                            builder: (context) => const TransactionTypeSelectionScreen(),
                           ),
                         );
                       },

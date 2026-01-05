@@ -35,72 +35,78 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Handle both snake_case (from backend) and camelCase (from local storage)
     return UserModel(
       id: json['id'],
       name: json['name'],
-      nameHindi: json['nameHindi'],
+      nameHindi: json['name_hindi'] ?? json['nameHindi'] ?? '',
       role: json['role'],
-      roleHindi: json['roleHindi'],
-      isActive: json['isActive'] ?? true,
+      roleHindi: json['role_hindi'] ?? json['roleHindi'] ?? '',
+      isActive: json['is_active'] ?? json['isActive'] ?? true,
       initials: json['initials'],
-      contactPerson: json['contactPerson'],
-      phoneNumber: json['phoneNumber'],
+      contactPerson: json['contact_person'] ?? json['contactPerson'],
+      phoneNumber: json['phone_number'] ?? json['phoneNumber'],
       address: json['address'],
-      partyType: json['partyType'],
-      gstNumber: json['gstNumber'],
-      openingBalance: (json['openingBalance'] is num) ? (json['openingBalance'] as num).toDouble() : null,
-      openingBalanceType: json['openingBalanceType'],
-      creditLimit: (json['creditLimit'] is num) ? (json['creditLimit'] as num).toDouble() : null,
+      partyType: json['party_type'] ?? json['partyType'],
+      gstNumber: json['gst_number'] ?? json['gstNumber'],
+      openingBalance: (json['opening_balance'] ?? json['openingBalance']) != null 
+          ? ((json['opening_balance'] ?? json['openingBalance']) as num).toDouble() 
+          : null,
+      openingBalanceType: json['opening_balance_type'] ?? json['openingBalanceType'],
+      creditLimit: (json['credit_limit'] ?? json['creditLimit']) != null
+          ? ((json['credit_limit'] ?? json['creditLimit']) as num).toDouble()
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() {
+    // Convert to snake_case for backend API compatibility
     return {
       'id': id,
       'name': name,
-      'nameHindi': nameHindi,
+      'name_hindi': nameHindi,
       'role': role,
-      'roleHindi': roleHindi,
-      'isActive': isActive,
+      'role_hindi': roleHindi,
+      'is_active': isActive,
       'initials': initials,
-      'contactPerson': contactPerson,
-      'phoneNumber': phoneNumber,
+      'contact_person': contactPerson,
+      'phone_number': phoneNumber,
       'address': address,
-      'partyType': partyType,
-      'gstNumber': gstNumber,
-      'openingBalance': openingBalance,
-      'openingBalanceType': openingBalanceType,
-      'creditLimit': creditLimit,
+      'party_type': partyType,
+      'gst_number': gstNumber,
+      'opening_balance': openingBalance,
+      'opening_balance_type': openingBalanceType,
+      'credit_limit': creditLimit,
     };
   }
 }
 
 enum UserRole {
-  worker,
-  supervisor,
-  manager,
+  admin,
+  pakkaMuneem,
+  kacchaMuneem,
 }
 
 extension UserRoleExtension on UserRole {
   String get displayName {
     switch (this) {
-      case UserRole.worker:
-        return 'Worker';
-      case UserRole.supervisor:
-        return 'Supervisor';
-      case UserRole.manager:
-        return 'Manager';
+      case UserRole.admin:
+        return 'Admin';
+      case UserRole.pakkaMuneem:
+        return 'Pakka Muneem';
+      case UserRole.kacchaMuneem:
+        return 'Kaccha Muneem';
     }
   }
 
   String get displayNameHindi {
     switch (this) {
-      case UserRole.worker:
-        return 'कर्मचारी';
-      case UserRole.supervisor:
-        return 'पर्यवेक्षक';
-      case UserRole.manager:
-        return 'प्रबंधक';
+      case UserRole.admin:
+        return 'एडमिन';
+      case UserRole.pakkaMuneem:
+        return 'पक्का मुनीम';
+      case UserRole.kacchaMuneem:
+        return 'कच्चा मुनीम';
     }
   }
 }

@@ -33,20 +33,34 @@ class SyncService {
     
     final box = Hive.box<NameModel>(_namesBoxName);
     
-    for (var name in box.values.where((n) => !n.synced)) {
+    final unsyncedNames = box.values.where((n) => !n.synced).toList();
+    
+    if (unsyncedNames.isEmpty) {
+      print("✅ All names are synced");
+      return;
+    }
+    
+    print("📤 Attempting to sync ${unsyncedNames.length} name(s)...");
+    
+    for (var name in unsyncedNames) {
       try {
         final response = await ApiService.sendName(name);
         if (response != null) {
           // Update the name with server ID and mark as synced
-          name.serverId = response['id']?.toString();
+          name.serverId = response['server_id']?.toString() ?? response['id']?.toString();
           name.synced = true;
           await name.save();
           print("✅ Synced: ${name.displayName}");
         } else {
-          print("❌ Failed to sync: ${name.displayName}");
+          print("❌ Failed to sync: ${name.displayName} (check logs above for details)");
+          // Stop syncing if we can't connect to the server to avoid spamming errors
+          // The remaining items will be synced on next attempt
+          break;
         }
       } catch (e) {
         print("❌ Error syncing ${name.displayName}: $e");
+        // Stop syncing on error to avoid spamming
+        break;
       }
     }
   }

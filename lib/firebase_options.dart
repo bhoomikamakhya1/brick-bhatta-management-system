@@ -27,10 +27,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -44,39 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'your-web-api-key',
-    appId: 'your-web-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyDe69wiKaopnCwaVmtbP5B6KN8V9ewDkaE',
+    appId: '1:319442119788:web:e0befc23b8ae7a8dffbc49',
+    messagingSenderId: '319442119788',
+    projectId: 'brick-bhatta-36052',
+    authDomain: 'brick-bhatta-36052.firebaseapp.com',
+    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    measurementId: 'G-FYXX4R9P53',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'your-android-api-key',
-    appId: 'your-android-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyD8bpoT0DNBtIC4ssu-rHt8E4T2xKkCHD4',
+    appId: '1:319442119788:android:10d5ff4595fab2e2ffbc49',
+    messagingSenderId: '319442119788',
+    projectId: 'brick-bhatta-36052',
+    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'your-ios-api-key',
-    appId: 'your-ios-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosClientId: 'your-ios-client-id',
-    iosBundleId: 'com.example.brickBhattaManagementSystem',
+    apiKey: 'AIzaSyCMZON7FOFSyDU5miAY0QaWizakGFlupZ0',
+    appId: '1:319442119788:ios:1cb8b6353e0e2f8affbc49',
+    messagingSenderId: '319442119788',
+    projectId: 'brick-bhatta-36052',
+    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    iosBundleId: 'com.brickbhattamanagementsystem.brickBhattaManagementSystem',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'your-ios-api-key',
-    appId: 'your-ios-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosClientId: 'your-ios-client-id',
-    iosBundleId: 'com.example.brickBhattaManagementSystem',
+    apiKey: 'AIzaSyCMZON7FOFSyDU5miAY0QaWizakGFlupZ0',
+    appId: '1:319442119788:ios:1cb8b6353e0e2f8affbc49',
+    messagingSenderId: '319442119788',
+    projectId: 'brick-bhatta-36052',
+    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    iosBundleId: 'com.brickbhattamanagementsystem.brickBhattaManagementSystem',
   );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDe69wiKaopnCwaVmtbP5B6KN8V9ewDkaE',
+    appId: '1:319442119788:web:b14004dda49a965fffbc49',
+    messagingSenderId: '319442119788',
+    projectId: 'brick-bhatta-36052',
+    authDomain: 'brick-bhatta-36052.firebaseapp.com',
+    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    measurementId: 'G-9640ZTQ7MY',
+  );
+
 }

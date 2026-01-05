@@ -6,6 +6,34 @@ import '../widgets/custom_dropdown.dart';
 import '../widgets/form_text_field.dart';
 import '../widgets/category_chip.dart';
 
+// Model for Pathai Labour Entry in Bharai form
+class PathaiLabourEntry {
+  String? pathaiThekedar;
+  String? pathaiLabourName;
+  double quantity;
+  final String id;
+
+  PathaiLabourEntry({
+    this.pathaiThekedar,
+    this.pathaiLabourName,
+    this.quantity = 0.0,
+    String? id,
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+}
+
+// Model for Brick Entry in Nikasi form
+class BrickEntry {
+  String? brickType;
+  double quantity;
+  final String id;
+
+  BrickEntry({
+    this.brickType,
+    this.quantity = 0.0,
+    String? id,
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+}
+
 class AddLabourWorkScreen extends StatefulWidget {
   final String? workType;
   
@@ -16,12 +44,16 @@ class AddLabourWorkScreen extends StatefulWidget {
 }
 
 class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
+  String? selectedThekedar;
   String? selectedLabour;
   String? selectedCategory;
   double quantity = 0.0;
   double? percentage;
   double rate = LabourData.getDefaultRate();
   double totalAmount = 0.0;
+
+  // Bharai-specific: Multiple Pathai labour entries
+  List<PathaiLabourEntry> pathaiLabourEntries = [];
 
   // Nikasi-specific fields
   String? selectedRound;
@@ -30,10 +62,43 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
   double piecesPerRound = 250.0;
   double totalQuantity = 0.0;
   double amount = 0.0;
-  final TextEditingController _notesController = TextEditingController();
+  // Nikasi-specific: Multiple brick entries
+  List<BrickEntry> brickEntries = [];
 
-  final List<String> labourNames = LabourData.getLabourNames();
-  final List<LabourCategory> categories = LabourData.getLabourCategories();
+  // Get thekedar names filtered by labour type matching the form type
+  List<String> get filteredThekedarNames {
+    final labourType = _getLabourTypeForForm();
+    return LabourData.getThekedarNames(labourType: labourType);
+  }
+  
+  // Get filtered labour names based on selected thekedar and form type
+  List<String> get filteredLabourNames {
+    final labourType = _getLabourTypeForForm();
+    return LabourData.getLabourNamesByThekedar(selectedThekedar, labourType: labourType);
+  }
+
+  // Get filtered pathai labour names based on selected pathai thekedar
+  // For Pathai entries in Bharai form, always use 'Pathai' as the labour type
+  List<String> getPathaiLabourNames(String? pathaiThekedar) {
+    return LabourData.getLabourNamesByThekedar(pathaiThekedar, labourType: 'Pathai');
+  }
+  
+  // Get the labour type for the current form
+  String? _getLabourTypeForForm() {
+    if (widget.workType == 'Bharai') {
+      return 'Bharai';
+    } else if (widget.workType == 'Nikasi') {
+      return 'Nikasi';
+    } else {
+      // Pathai form (when workType is null or 'Pathai')
+      return 'Pathai';
+    }
+  }
+
+  // Calculate total quantity from all pathai labour entries
+  double get totalPathaiQuantity {
+    return pathaiLabourEntries.fold(0.0, (sum, entry) => sum + entry.quantity);
+  }
   
   final List<String> rounds = [
     '1 Round / 1 चक्कर',
@@ -47,11 +112,18 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
   ];
 
   final List<String> brickTypes = [
-    'Red Brick / लाल ईंट',
-    'Fly Ash Brick / फ्लाई ऐश ईंट',
-    'Concrete Block / कंक्रीट ब्लॉक',
-    'Hollow Brick / खोखली ईंट',
+    'Awwal / अव्वल',
+    'Doyam / दोयम',
+    'Talsa / तलसा',
+    'Chatka / चटका',
+    'Kaccha Peela / कच्चा पीला',
+    'Pakka Peela / पक्का पीला',
   ];
+  
+  // Calculate total quantity from all brick entries
+  double get totalBrickQuantity {
+    return brickEntries.fold(0.0, (sum, entry) => sum + entry.quantity);
+  }
 
   final List<String> calculationTypes = [
     'Pai / पाई',
@@ -63,38 +135,78 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
   void initState() {
     super.initState();
     _calculateTotal();
-    if (widget.workType == 'Nikasi') {
-      selectedRound = rounds[0]; // Default to first round
-    }
   }
 
   @override
   void dispose() {
-    _notesController.dispose();
     super.dispose();
   }
 
   void _calculateTotal() {
     if (widget.workType == 'Nikasi') {
       _calculateNikasiAmounts();
+    } else if (widget.workType == 'Bharai') {
+      // For Bharai, use total pathai quantity and Bharai labour rate
+      if (selectedLabour != null) {
+        final bharaiLabourRate = LabourData.getRateForLabour(selectedLabour!);
+        setState(() {
+          quantity = totalPathaiQuantity;
+          rate = bharaiLabourRate;
+          totalAmount = totalPathaiQuantity * bharaiLabourRate; // Use Bharai labour rate
+        });
+      }
     } else {
-      setState(() {
-        totalAmount = quantity * rate;
-        if (percentage != null && percentage! > 0) {
-          totalAmount = totalAmount * (percentage! / 100);
-        }
-      });
+      // Pathai form: Fetch rate for selected labour and calculate amount
+      if (selectedLabour != null) {
+        final labourRate = LabourData.getRateForLabour(selectedLabour!);
+        setState(() {
+          rate = labourRate;
+          totalAmount = quantity * rate;
+        });
+      }
     }
   }
 
+  // Add new pathai labour entry
+  void _addPathaiLabourEntry() {
+    setState(() {
+      pathaiLabourEntries.add(PathaiLabourEntry());
+    });
+  }
+
+  // Remove pathai labour entry
+  void _removePathaiLabourEntry(String id) {
+    setState(() {
+      pathaiLabourEntries.removeWhere((entry) => entry.id == id);
+    });
+    _calculateTotal(); // Recalculate total amount using Bharai labour rate
+  }
+
   void _calculateNikasiAmounts() {
-    if (selectedRound != null) {
-      final roundNumber = int.tryParse(selectedRound!.split(' ')[0]) ?? 1;
+    if (selectedLabour != null) {
+      final labourRate = LabourData.getRateForLabour(selectedLabour!);
       setState(() {
-        totalQuantity = piecesPerRound * roundNumber;
-        amount = totalQuantity * 2.0; // Assuming ₹2 per piece
+        rate = labourRate;
+        // Calculate total quantity from all brick entries
+        totalQuantity = totalBrickQuantity;
+        amount = totalQuantity * rate; // Calculate amount from fetched rate
       });
     }
+  }
+  
+  // Add new brick entry
+  void _addBrickEntry() {
+    setState(() {
+      brickEntries.add(BrickEntry());
+    });
+  }
+
+  // Remove brick entry
+  void _removeBrickEntry(String id) {
+    setState(() {
+      brickEntries.removeWhere((entry) => entry.id == id);
+    });
+    _calculateTotal(); // Recalculate total amount
   }
 
   @override
@@ -166,6 +278,24 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Thekedar Dropdown
+        CustomDropdown(
+          label: 'Thekedar',
+          labelHindi: 'ठेकेदार',
+          hint: 'Select Thekedar',
+          hintHindi: 'ठेकेदार चुनें',
+          value: selectedThekedar,
+          items: filteredThekedarNames,
+          onChanged: (value) {
+            setState(() {
+              selectedThekedar = value;
+              selectedLabour = null; // Reset labour when thekedar changes
+            });
+          },
+        ),
+        
+        const SizedBox(height: 16),
+        
         // Labour Name Dropdown
         CustomDropdown(
           label: 'Labour Name',
@@ -173,11 +303,16 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
           hint: 'Select Labour',
           hintHindi: 'मजदूर चुनें',
           value: selectedLabour,
-          items: labourNames,
+          items: filteredLabourNames,
           onChanged: (value) {
             setState(() {
               selectedLabour = value;
+              // Fetch rate for selected labour from ledger entries
+              if (value != null) {
+                rate = LabourData.getRateForLabour(value);
+              }
             });
+            _calculateTotal();
           },
         ),
         
@@ -198,75 +333,55 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
           },
         ),
         
-        const SizedBox(height: 16),
-        
-        // Brick Type Dropdown
-        CustomDropdown(
-          label: 'Brick Type',
-          labelHindi: 'ईंट का प्रकार',
-          hint: 'Select Brick Type',
-          hintHindi: 'ईंट का प्रकार चुनें',
-          value: selectedBrickType,
-          items: brickTypes,
-          onChanged: (value) {
-            setState(() {
-              selectedBrickType = value;
-            });
-          },
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Auto Calculated Section
-        const Text(
-          'Auto Calculated / स्वचालित गणना',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF333333),
+        // Show brick entries section only if "No of Bricks" is selected
+        if (selectedCalculationType == 'No of Bricks / ईंटों की संख्या') ...[
+          const SizedBox(height: 20),
+          
+          // Brick Entries Section Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Brick Entries / ईंट प्रविष्टियां',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Color(0xFF8B4513)),
+                onPressed: _addBrickEntry,
+                tooltip: 'Add Brick Entry',
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        
-        // Pieces per Round
-        FormTextField(
-          label: 'Pieces per Round',
-          labelHindi: 'प्रति चक्कर टुकड़े',
-          value: '${piecesPerRound.toInt()} pieces / टुकड़े',
-          readOnly: true,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Total Quantity
-        FormTextField(
-          label: 'Total Quantity',
-          labelHindi: 'कुल मात्रा',
-          value: '${totalQuantity.toInt()} pieces / टुकड़े',
-          readOnly: true,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Amount
-        FormTextField(
-          label: 'Amount',
-          labelHindi: 'राशि',
-          value: '₹ ${amount.toStringAsFixed(0)}',
-          readOnly: true,
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Notes Field
-        FormTextField(
-          label: 'Notes (Optional)',
-          labelHindi: 'टिप्पणी (वैकल्पिक)',
-          hint: 'Add any notes',
-          hintHindi: 'कोई टिप्पणी जोड़ें',
-          controller: _notesController,
-          maxLines: 3,
-        ),
+          
+          const SizedBox(height: 12),
+          
+          // List of Brick Entries
+          ...brickEntries.map((entry) => _buildBrickEntry(entry)),
+          
+          const SizedBox(height: 16),
+          
+          // Total Quantity (Auto-calculated)
+          FormTextField(
+            label: 'Total Quantity (Auto-calculated)',
+            labelHindi: 'कुल मात्रा (स्वचालित)',
+            value: totalBrickQuantity.toStringAsFixed(2),
+            readOnly: true,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Total Amount
+          FormTextField(
+            label: 'Total Amount',
+            labelHindi: 'कुल राशि',
+            value: '₹ ${amount.toStringAsFixed(2)}',
+            readOnly: true,
+          ),
+        ],
         
         const SizedBox(height: 24),
         
@@ -304,101 +419,167 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Labour Name Dropdown
+        // Thekedar Dropdown
         CustomDropdown(
-          label: 'Labour Name',
-          labelHindi: 'श्रमिक का नाम',
-          hint: 'Select Labour',
-          hintHindi: 'श्रमिक चुनें',
-          value: selectedLabour,
-          items: labourNames,
+          label: 'Thekedar',
+          labelHindi: 'ठेकेदार',
+          hint: 'Select Thekedar',
+          hintHindi: 'ठेकेदार चुनें',
+          value: selectedThekedar,
+          items: filteredThekedarNames,
           onChanged: (value) {
             setState(() {
-              selectedLabour = value;
+              selectedThekedar = value;
+              selectedLabour = null; // Reset labour when thekedar changes
             });
           },
         ),
         
         const SizedBox(height: 16),
         
-        // Category Chips
-        Wrap(
-          children: categories.map((category) {
-            return CategoryChip(
-              label: category.name,
-              backgroundColor: category.color,
-              isSelected: selectedCategory == category.name,
-              onTap: () {
-                setState(() {
-                  selectedCategory = category.name;
-                });
-              },
-            );
-          }).toList(),
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Quantity Field
-        FormTextField(
-          label: 'Quantity *',
-          hint: 'Enter quantity',
-          keyboardType: TextInputType.number,
+        // Labour Name Dropdown (Bharai Labour)
+        if (widget.workType=='Bharai')
+        CustomDropdown(
+          label: 'Bharai Labour Name',
+          labelHindi: 'भराई श्रमिक का नाम',
+          hint: 'Select Bharai Labour',
+          hintHindi: 'भराई श्रमिक चुनें',
+          value: selectedLabour,
+          items: filteredLabourNames,
           onChanged: (value) {
-            final qty = double.tryParse(value) ?? 0.0;
             setState(() {
-              quantity = qty;
+              selectedLabour = value;
+              // Fetch rate for selected Bharai labour from ledger entries
+              if (value != null) {
+                rate = LabourData.getRateForLabour(value);
+              }
             });
             _calculateTotal();
           },
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Percentage Field
-        FormTextField(
-          label: 'Percentage (Optional)',
-          hint: 'Enter percentage',
-          keyboardType: TextInputType.number,
-          onChanged: (value) {
-            final pct = double.tryParse(value);
-            setState(() {
-              percentage = pct;
-            });
-            _calculateTotal();
-          },
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Rate Field
-        FormTextField(
-          label: 'Rate',
-          value: rate.toStringAsFixed(2),
-          keyboardType: TextInputType.number,
-          onChanged: (value) {
-            final r = double.tryParse(value) ?? LabourData.getDefaultRate();
-            setState(() {
-              rate = r;
-            });
-            _calculateTotal();
-          },
-        ),
-        
-        const SizedBox(height: 4),
-        Text(
-          'Default from Rate Master',
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[500],
+        )
+        else
+          CustomDropdown(
+            label: 'Pathai Labour Name',
+            labelHindi: 'पठाई श्रमिक का नाम',
+            hint: 'Select Pathai Labour',
+            hintHindi: 'पठाई श्रमिक चुनें',
+            value: selectedLabour,
+            items: filteredLabourNames,
+            onChanged: (value) {
+              setState(() {
+                selectedLabour = value;
+                // Fetch rate for selected Pathai labour from ledger entries
+                if (value != null) {
+                  rate = LabourData.getRateForLabour(value);
+                }
+              });
+              _calculateTotal();
+            },
           ),
-        ),
+        
+        const SizedBox(height: 16),
+        
+        // Category Chips
+        // Wrap(
+        //   children: categories.map((category) {
+        //     return CategoryChip(
+        //       label: category.name,
+        //       backgroundColor: category.color,
+        //       isSelected: selectedCategory == category.name,
+        //       onTap: () {
+        //         setState(() {
+        //           selectedCategory = category.name;
+        //         });
+        //       },
+        //     );
+        //   }).toList(),
+        // ),
         
         const SizedBox(height: 20),
         
-        // Total Amount Field
+        // For Bharai: Show Pathai Labour section
+        if (widget.workType == 'Bharai') ...[
+          // Pathai Labour Section Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Pathai Labour / पठाई श्रमिक',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Color(0xFF8B4513)),
+                onPressed: _addPathaiLabourEntry,
+                tooltip: 'Add Pathai Labour',
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // List of Pathai Labour Entries
+          ...pathaiLabourEntries.map((entry) => _buildPathaiLabourEntry(entry)),
+          
+          const SizedBox(height: 16),
+          
+          // Total Quantity (Auto-calculated)
+          FormTextField(
+            label: 'Total Quantity (Auto-calculated)',
+            labelHindi: 'कुल मात्रा (स्वचालित)',
+            value: totalPathaiQuantity.toStringAsFixed(2),
+            readOnly: true,
+          ),
+        ] else ...[
+          // For Pathai: Show regular Quantity Field
+          FormTextField(
+            label: 'Quantity *',
+            hint: 'Enter quantity',
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              final qty = double.tryParse(value) ?? 0.0;
+              setState(() {
+                quantity = qty;
+              });
+              _calculateTotal();
+            },
+          ),
+        ],
+        
+        const SizedBox(height: 20),
+        
+        // Rate Field - Commented out (Rate will be fetched from DB for each labour in ledger entry)
+        // FormTextField(
+        //   label: 'Rate',
+        //   value: rate.toStringAsFixed(2),
+        //   keyboardType: TextInputType.number,
+        //   onChanged: (value) {
+        //     final r = double.tryParse(value) ?? LabourData.getDefaultRate();
+        //     setState(() {
+        //       rate = r;
+        //     });
+        //     _calculateTotal();
+        //   },
+        // ),
+        // 
+        // const SizedBox(height: 4),
+        // Text(
+        //   'Default from Rate Master',
+        //   style: TextStyle(
+        //     fontSize: 10,
+        //     color: Colors.grey[500],
+        //   ),
+        // ),
+        
+        // const SizedBox(height: 20),
+        
+        // Total Amount Field (Will be calculated from DB rates in ledger entry)
         FormTextField(
           label: 'Total Amount',
+          labelHindi: 'कुल राशि',
           value: '₹ ${totalAmount.toStringAsFixed(2)}',
           readOnly: true,
         ),
@@ -436,7 +617,7 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
 
   void _saveLabourWork() {
     if (widget.workType == 'Nikasi') {
-      if (selectedLabour == null || selectedBrickType == null || selectedCalculationType == null) {
+      if (selectedLabour == null || selectedCalculationType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please fill all required fields'),
@@ -445,7 +626,82 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
         );
         return;
       }
+      // Validate brick entries if "No of Bricks" is selected
+      if (selectedCalculationType == 'No of Bricks / ईंटों की संख्या') {
+        if (brickEntries.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please add at least one brick entry'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        // Validate all brick entries
+        for (var entry in brickEntries) {
+          if (entry.brickType == null || entry.quantity <= 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please fill all brick entries completely'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+        }
+        if (totalBrickQuantity <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Total quantity must be greater than 0'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
+    } else if (widget.workType == 'Bharai') {
+      // Validate Bharai form
+      if (selectedLabour == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select Bharai labour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (pathaiLabourEntries.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add at least one Pathai labour entry'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      // Validate all pathai entries
+      for (var entry in pathaiLabourEntries) {
+        if (entry.pathaiThekedar == null || entry.pathaiLabourName == null || entry.quantity <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please fill all Pathai labour entries completely'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
+      if (totalPathaiQuantity <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Total quantity must be greater than 0'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     } else {
+      // Pathai form validation
       if (selectedLabour == null || quantity <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -491,9 +747,17 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
 
   LabourWork _createWorkEntry() {
     final workType = widget.workType ?? 'General';
-    final workQuantity = widget.workType == 'Nikasi' ? totalQuantity : quantity;
-    final workAmount = widget.workType == 'Nikasi' ? amount : totalAmount;
-    final workRate = widget.workType == 'Nikasi' ? 2.0 : rate; // ₹2 per piece for Nikasi
+    final workQuantity = widget.workType == 'Nikasi' 
+        ? totalQuantity 
+        : (widget.workType == 'Bharai' ? totalPathaiQuantity : quantity);
+    
+    // Fetch rate for selected labour from ledger entries
+    final workRate = selectedLabour != null 
+        ? LabourData.getRateForLabour(selectedLabour!)
+        : LabourData.getDefaultRate();
+    
+    // Calculate amount = rate * quantity
+    final workAmount = workQuantity * workRate;
 
     return LabourWork(
       id: WorkDataService.generateId(),
@@ -501,14 +765,177 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
       labourCategory: workType,
       quantity: workQuantity,
       percentage: percentage,
-      rate: workRate,
-      totalAmount: workAmount,
+      rate: workRate, // Fetched from ledger entries mapping
+      totalAmount: workAmount, // Calculated as rate * quantity
       date: DateTime.now(),
+    );
+  }
+
+  // Build widget for a single Pathai Labour Entry
+  Widget _buildPathaiLabourEntry(PathaiLabourEntry entry) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with remove button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Pathai Labour Entry ${pathaiLabourEntries.indexOf(entry) + 1}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF666666),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                onPressed: () => _removePathaiLabourEntry(entry.id),
+                tooltip: 'Remove Entry',
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Pathai Thekedar Dropdown
+          CustomDropdown(
+            label: 'Pathai Thekedar',
+            labelHindi: 'पठाई ठेकेदार',
+            hint: 'Select Pathai Thekedar',
+            hintHindi: 'पठाई ठेकेदार चुनें',
+            value: entry.pathaiThekedar,
+            items: LabourData.getThekedarNames(labourType: 'Pathai'),
+            onChanged: (value) {
+              setState(() {
+                entry.pathaiThekedar = value;
+                entry.pathaiLabourName = null; // Reset labour when thekedar changes
+              });
+            },
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Pathai Labour Name Dropdown
+          CustomDropdown(
+            label: 'Pathai Labour Name',
+            labelHindi: 'पठाई श्रमिक का नाम',
+            hint: 'Select Pathai Labour',
+            hintHindi: 'पठाई श्रमिक चुनें',
+            value: entry.pathaiLabourName,
+            items: getPathaiLabourNames(entry.pathaiThekedar),
+            onChanged: (value) {
+              setState(() {
+                entry.pathaiLabourName = value;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Quantity Field for this entry
+          FormTextField(
+            label: 'Quantity *',
+            labelHindi: 'मात्रा *',
+            hint: 'Enter quantity',
+            hintHindi: 'मात्रा दर्ज करें',
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              final qty = double.tryParse(value) ?? 0.0;
+              setState(() {
+                entry.quantity = qty;
+              });
+              _calculateTotal(); // Recalculate total amount
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build widget for a single Brick Entry
+  Widget _buildBrickEntry(BrickEntry entry) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with remove button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Brick Entry ${brickEntries.indexOf(entry) + 1}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF666666),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                onPressed: () => _removeBrickEntry(entry.id),
+                tooltip: 'Remove Entry',
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Brick Type Dropdown
+          CustomDropdown(
+            label: 'Brick Type',
+            labelHindi: 'ईंट का प्रकार',
+            hint: 'Select Brick Type',
+            hintHindi: 'ईंट का प्रकार चुनें',
+            value: entry.brickType,
+            items: brickTypes,
+            onChanged: (value) {
+              setState(() {
+                entry.brickType = value;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Quantity Field for this entry
+          FormTextField(
+            label: 'Quantity *',
+            labelHindi: 'मात्रा *',
+            hint: 'Enter quantity',
+            hintHindi: 'मात्रा दर्ज करें',
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              final qty = double.tryParse(value) ?? 0.0;
+              setState(() {
+                entry.quantity = qty;
+              });
+              _calculateTotal(); // Recalculate total amount
+            },
+          ),
+        ],
+      ),
     );
   }
 
   void _clearForm() {
     setState(() {
+      selectedThekedar = null;
       selectedLabour = null;
       selectedCategory = null;
       selectedBrickType = null;
@@ -519,7 +946,8 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
       totalAmount = 0.0;
       totalQuantity = 0.0;
       amount = 0.0;
-      _notesController.clear();
+      pathaiLabourEntries.clear();
+      brickEntries.clear();
     });
   }
 }

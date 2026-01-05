@@ -27,9 +27,12 @@ class _SyncDemoScreenState extends State<SyncDemoScreen> {
   Future<void> _addName() async {
     if (_nameController.text.trim().isEmpty) return;
 
+    final groupInput = _groupController.text.trim().isEmpty ? 'General' : _groupController.text.trim();
+    final mappedGroup = UserSyncBridge.mapRoleToBackendGroup(groupInput);
+
     final name = NameModel(
       displayName: _nameController.text.trim(),
-      group: _groupController.text.trim().isEmpty ? 'General' : _groupController.text.trim(),
+      group: mappedGroup,
       phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
     );
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dashboard_screen.dart';
+import '../services/sale_data_service.dart';
+import '../services/user_sync_bridge.dart';
+import '../services/work_data_service.dart';
+import 'dashboard_screen.dart' show DashboardScreen, DashboardScreenState;
 import 'ledger_screen.dart';
 import 'transactions_screen.dart';
 import 'work_list_screen.dart';
@@ -16,13 +19,39 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
+  final GlobalKey<State<DashboardScreen>> _dashboardKey = GlobalKey<State<DashboardScreen>>();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // Fetch data from backend on startup
+    await Future.wait([
+      SaleDataService.fetchSales(),
+      UserSyncBridge.fetchAndSyncUsers(),
+      WorkDataService.fetchWorkEntries(),
+    ]);
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   List<Widget> get _screens => [
-    DashboardScreen(onNavigateToReports: () {
-      setState(() {
-        _currentIndex = 4; // Reports tab index
-      });
-    }),
+    DashboardScreen(
+      key: _dashboardKey,
+      onNavigateToReports: () {
+        setState(() {
+          _currentIndex = 4; // Reports tab index
+        });
+      },
+    ),
     const WorkListScreen(),
     const LedgerScreen(),
     const TransactionsScreen(),
@@ -33,10 +62,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B4513)))
+        : IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -104,6 +135,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       onTap: () {
         setState(() {
           _currentIndex = index;
+          // Refresh dashboard when navigating to home tab
+          if (index == 0 && _dashboardKey.currentState != null) {
+            final dashboardState = _dashboardKey.currentState;
+            if (dashboardState is DashboardScreenState) {
+              dashboardState.refreshStats();
+            }
+          }
         });
       },
       child: Container(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'add_transaction_screen.dart';
+import 'transaction_type_selection_screen.dart';
 import '../models/transaction_model.dart';
+import '../services/transaction_service.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -98,72 +100,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }).toList();
   }
 
-  final List<TransactionItem> _transactions = [
-    TransactionItem(
-      hindiName: 'राज ईंट भट्टा',
-      englishName: 'Raj Brick Kiln',
-      amount: 25000,
-      type: TransactionType.credit,
-      date: '15 Jan 2024',
-      category: 'Sales',
-    ),
-    TransactionItem(
-      hindiName: 'शर्मा कंस्ट्रक्शन',
-      englishName: 'Sharma Construction',
-      amount: 18500,
-      type: TransactionType.debit,
-      date: '14 Jan 2024',
-      category: 'Purchase',
-    ),
-    TransactionItem(
-      hindiName: 'गुप्ता ट्रांसपोर्ट',
-      englishName: 'Gupta Transport',
-      amount: 12000,
-      type: TransactionType.credit,
-      date: '13 Jan 2024',
-      category: 'Transport',
-    ),
-    TransactionItem(
-      hindiName: 'लेबर पेमेंट',
-      englishName: 'Labor Payment',
-      amount: 8200,
-      type: TransactionType.debit,
-      date: '12 Jan 2024',
-      category: 'Labor Payment',
-    ),
-    TransactionItem(
-      hindiName: 'कोयला सप्लाई',
-      englishName: 'Coal Supply',
-      amount: 15600,
-      type: TransactionType.debit,
-      date: '11 Jan 2024',
-      category: 'Fuel',
-    ),
-    TransactionItem(
-      hindiName: 'पटेल बिल्डर्स',
-      englishName: 'Patel Builders',
-      amount: 32000,
-      type: TransactionType.credit,
-      date: '10 Jan 2024',
-      category: 'Sales',
-    ),
-    TransactionItem(
-      hindiName: 'सिंह एंटरप्राइजेज',
-      englishName: 'Singh Enterprises',
-      amount: 15000,
-      type: TransactionType.debit,
-      date: '09 Jan 2024',
-      category: 'Purchase',
-    ),
-    TransactionItem(
-      hindiName: 'मशीन मरम्मत',
-      englishName: 'Machine Repair',
-      amount: 7500,
-      type: TransactionType.debit,
-      date: '08 Jan 2024',
-      category: 'Maintenance',
-    ),
-  ];
+  List<TransactionItem> _transactions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    final txns = await TransactionService.fetchTransactions();
+    if (mounted) {
+      setState(() {
+        _transactions = txns;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +251,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
           // Transaction List
           Expanded(
-            child: _filteredTransactions.isEmpty
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B4513)))
+                : _filteredTransactions.isEmpty
                 ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -344,15 +300,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddTransactionScreen(),
+              builder: (context) => const TransactionTypeSelectionScreen(),
             ),
           );
           
-          // If a new transaction was added, add it to the list
+          // If a new transaction was added, add it to the backend
+          // Note: TransactionService.addTransaction already adds it to the local list
           if (result is TransactionItem) {
-            setState(() {
-              _transactions.insert(0, result); // Add to beginning of list
-            });
+            final createdTransaction = await TransactionService.addTransaction(result);
+            if (createdTransaction != null) {
+              // Refresh the list from the service (it's already added there, so no need to insert again)
+              setState(() {
+                _transactions = TransactionService.getAllTransactions();
+              });
+            }
           }
         },
         backgroundColor: const Color(0xFFFF6F00),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "319442119788",
+    "project_id": "brick-bhatta-36052",
+    "storage_bucket": "brick-bhatta-36052.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:319442119788:android:10d5ff4595fab2e2ffbc49",
+        "android_client_info": {
+          "package_name": "com.brick_bhatta_management_system.brick_bhatta_management_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8bpoT0DNBtIC4ssu-rHt8E4T2xKkCHD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

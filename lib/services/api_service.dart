@@ -1,4 +1,5 @@
-import 'dart:convert';
+ import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/name_model.dart';
 import '../config/api_config.dart';
@@ -8,10 +9,17 @@ class ApiService {
   /// Send a new name to the FastAPI backend
   static Future<Map<String, dynamic>?> sendName(NameModel name) async {
     try {
-      final url = Uri.parse(ApiConfig.namesUrl);
+      // Ensure URL has trailing slash to avoid 307 redirect
+      String urlString = ApiConfig.namesUrl;
+      if (!urlString.endsWith('/')) {
+        urlString += '/';
+      }
+      final url = Uri.parse(urlString);
+      
+      final headers = await ApiConfig.headers;
       final response = await http.post(
         url, 
-        headers: ApiConfig.headers, 
+        headers: headers, 
         body: jsonEncode(name.toJson())
       ).timeout(
         const Duration(seconds: 30),
@@ -21,6 +29,36 @@ class ApiService {
         },
       );
 
+      // Handle redirects (307 Temporary Redirect)
+      if (response.statusCode == 307 || response.statusCode == 308) {
+        final location = response.headers['location'];
+        if (location != null) {
+          print('🔄 Following redirect to: $location');
+          final redirectUrl = Uri.parse(location);
+          final redirectHeaders = await ApiConfig.headers;
+          final redirectResponse = await http.post(
+            redirectUrl,
+            headers: redirectHeaders,
+            body: jsonEncode(name.toJson())
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              print('⏰ Redirect request timeout');
+              throw Exception('Request timeout');
+            },
+          );
+          
+          if (redirectResponse.statusCode == 200 || redirectResponse.statusCode == 201) {
+            final responseData = jsonDecode(redirectResponse.body);
+            return responseData;
+          } else {
+            print('❌ Failed to send name after redirect: ${redirectResponse.statusCode} - ${redirectResponse.body}');
+            print('📤 Sent data: ${jsonEncode(name.toJson())}');
+            return null;
+          }
+        }
+      }
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
         return responseData;
@@ -29,6 +67,18 @@ class ApiService {
         print('📤 Sent data: ${jsonEncode(name.toJson())}');
         return null;
       }
+    } on SocketException catch (e) {
+      print('❌ Network error: Cannot connect to backend server');
+      print('   Address: ${ApiConfig.baseUrl}');
+      print('   Error: ${e.message}');
+      print('   Make sure:');
+      print('   1. Backend server is running');
+      print('   2. Device and server are on the same network');
+      print('   3. IP address is correct (current: ${ApiConfig.baseUrl})');
+      return null;
+    } on HttpException catch (e) {
+      print('❌ HTTP error sending name: $e');
+      return null;
     } catch (e) {
       print('❌ Error sending name: $e');
       return null;
@@ -38,14 +88,46 @@ class ApiService {
   /// Fetch all names from the FastAPI backend
   static Future<List<NameModel>> fetchNames() async {
     try {
-      final url = Uri.parse(ApiConfig.namesUrl);
-      final response = await http.get(url, headers: ApiConfig.headers).timeout(
+      // Ensure URL has trailing slash to avoid 307 redirect
+      String urlString = ApiConfig.namesUrl;
+      if (!urlString.endsWith('/')) {
+        urlString += '/';
+      }
+      final url = Uri.parse(urlString);
+      
+      final headers = await ApiConfig.headers;
+      final response = await http.get(url, headers: headers).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           print('⏰ Fetch names timeout - service may be sleeping');
           throw Exception('Request timeout - service may be sleeping');
         },
       );
+
+      // Handle redirects
+      if (response.statusCode == 307 || response.statusCode == 308) {
+        final location = response.headers['location'];
+        if (location != null) {
+          print('🔄 Following redirect to: $location');
+          final redirectUrl = Uri.parse(location);
+          final redirectHeaders = await ApiConfig.headers;
+          final redirectResponse = await http.get(redirectUrl, headers: redirectHeaders).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              print('⏰ Redirect request timeout');
+              throw Exception('Request timeout');
+            },
+          );
+          
+          if (redirectResponse.statusCode == 200) {
+            final List<dynamic> data = jsonDecode(redirectResponse.body);
+            return data.map((json) => NameModel.fromJson(json)).toList();
+          } else {
+            print('❌ Failed to fetch names after redirect: ${redirectResponse.statusCode} - ${redirectResponse.body}');
+            return [];
+          }
+        }
+      }
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -66,9 +148,10 @@ class ApiService {
     
     try {
       final url = Uri.parse(ApiConfig.getNameUrl(name.serverId!));
+      final headers = await ApiConfig.headers;
       final response = await http.put(
         url, 
-        headers: ApiConfig.headers, 
+        headers: headers, 
         body: jsonEncode(name.toJson())
       );
 
@@ -83,7 +166,8 @@ class ApiService {
   static Future<bool> deleteName(String serverId) async {
     try {
       final url = Uri.parse(ApiConfig.getNameUrl(serverId));
-      final response = await http.delete(url, headers: ApiConfig.headers);
+      final headers = await ApiConfig.headers;
+      final response = await http.delete(url, headers: headers);
 
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
@@ -96,7 +180,8 @@ class ApiService {
   static Future<bool> testConnection() async {
     try {
       final url = Uri.parse(ApiConfig.healthUrl);
-      final response = await http.get(url, headers: ApiConfig.headers).timeout(
+      final headers = await ApiConfig.headers;
+      final response = await http.get(url, headers: headers).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           print('⏰ Health check timeout after 30 seconds');
@@ -115,7 +200,8 @@ class ApiService {
   static Future<void> testNamesEndpoint() async {
     try {
       final url = Uri.parse(ApiConfig.namesUrl);
-      final response = await http.get(url, headers: ApiConfig.headers).timeout(
+      final headers = await ApiConfig.headers;
+      final response = await http.get(url, headers: headers).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           print('⏰ Names endpoint timeout - service may be sleeping');
@@ -135,7 +221,8 @@ class ApiService {
       
       // Try health endpoint first
       final healthUrl = Uri.parse(ApiConfig.healthUrl);
-      final healthResponse = await http.get(healthUrl, headers: ApiConfig.headers).timeout(
+      final healthHeaders = await ApiConfig.headers;
+      final healthResponse = await http.get(healthUrl, headers: healthHeaders).timeout(
         const Duration(seconds: 60), // Longer timeout for wake-up
         onTimeout: () {
           print('⏰ Health wake-up timeout');
@@ -150,7 +237,8 @@ class ApiService {
       
       // If health fails, try names endpoint
       final namesUrl = Uri.parse(ApiConfig.namesUrl);
-      final namesResponse = await http.get(namesUrl, headers: ApiConfig.headers).timeout(
+      final namesHeaders = await ApiConfig.headers;
+      final namesResponse = await http.get(namesUrl, headers: namesHeaders).timeout(
         const Duration(seconds: 60),
         onTimeout: () {
           print('⏰ Names wake-up timeout');

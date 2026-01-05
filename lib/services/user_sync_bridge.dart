@@ -1,4 +1,8 @@
 import 'package:hive/hive.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import '../config/api_config.dart';
 import '../models/user_model.dart';
 import '../models/name_model.dart';
 import '../data/user_data.dart';
@@ -9,7 +13,7 @@ class UserSyncBridge {
   static NameModel userToName(UserModel user) {
     return NameModel(
       displayName: user.name,
-      group: user.role,
+      group: mapRoleToBackendGroup(user.role),
       phone: user.phoneNumber,
       gstin: user.gstNumber,
       commissionPercent: null, // Could be extracted from user data if available
@@ -51,28 +55,68 @@ class UserSyncBridge {
     print("🔄 Synced ${users.length} users to sync system");
   }
 
-  /// Get all users from sync system as UserModels
-  static List<UserModel> getUsersFromSync() {
-    final names = SyncService.getAllNames();
-    return names.map((name) => nameToUser(name)).toList();
+  /// Fetch all users from backend and populate local cache
+  static Future<void> fetchAndSyncUsers() async {
+    try {
+      final headers = await ApiConfig.headers;
+      
+      final response = await http.get(
+        Uri.parse(ApiConfig.usersUrl),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final backendUsers = data.map((json) => UserModel.fromJson(json)).toList();
+        
+        // Clear local cache and repopulate
+        UserData.clear();
+        for (var user in backendUsers) {
+          UserData.addUser(user);
+        }
+        print('✅ Fetched & Synced ${backendUsers.length} users from backend');
+      } else {
+        print('❌ Failed to fetch users: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching users: $e');
+    }
+  }
+
+  /// Get all users (from local cache)
+  static List<UserModel> getAllUsers() {
+    return UserData.getUsers();
   }
 
   /// Add a user to both UserData and sync system (OPTIMIZED)
+  /// Add a user to backend and local storage
   static Future<void> addUser(UserModel user) async {
     try {
       print('🔄 UserSyncBridge: Adding user ${user.name}');
       
-      // Add to existing UserData (fast local operation)
+      // 1. Add to local cache first for responsiveness
       UserData.addUser(user);
-      print('✅ UserSyncBridge: Added to UserData');
       
-      // Optimized: Direct Hive box access for faster operations
-      final box = await Hive.openBox<NameModel>('names');
-      final name = userToName(user);
-      print('🔄 UserSyncBridge: Converting to NameModel: ${name.displayName}');
+      // 2. Send to Backend
+      final headers = await ApiConfig.headers;
+      print('🔑 [UserSyncBridge] Headers: ${headers.containsKey('Authorization') ? 'Authorization header present' : 'NO Authorization header'}');
+      if (headers.containsKey('Authorization')) {
+        final authHeader = headers['Authorization']!;
+        print('🔑 [UserSyncBridge] Auth token: ${authHeader.substring(0, authHeader.length > 30 ? 30 : authHeader.length)}...');
+      }
       
-      await box.add(name);
-      print('✅ UserSyncBridge: Added to sync system');
+      final response = await http.post(
+        Uri.parse(ApiConfig.usersUrl),
+        headers: headers,
+        body: jsonEncode(user.toJson()),
+      );
+        
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ UserSyncBridge: Added to Backend');
+      } else {
+        print('❌ UserSyncBridge: Failed to push to backend: ${response.statusCode}');
+        print('❌ [UserSyncBridge] Response body: ${response.body}');
+      }
       
     } catch (e) {
       print('❌ UserSyncBridge: Error adding user: $e');
@@ -80,59 +124,26 @@ class UserSyncBridge {
     }
   }
 
-  /// Update a user in both UserData and sync system (OPTIMIZED)
+  /// Update a user
   static Future<void> updateUser(UserModel user) async {
     try {
       print('🔄 UserSyncBridge: Updating user ${user.name}');
       
-      // Update in existing UserData (fast local operation)
       UserData.updateUser(user);
-      print('✅ UserSyncBridge: Updated in UserData');
       
-      // Optimized: Direct Hive box access for faster operations
-      final box = await Hive.openBox<NameModel>('names');
-      NameModel? matchingName;
-      
-      // Try to find by user ID first (most reliable) - optimized search
-      try {
-        matchingName = box.values.firstWhere(
-          (name) => name.serverId == user.id || 
-                    name.createdAt.millisecondsSinceEpoch.toString() == user.id,
-        );
-        print('✅ UserSyncBridge: Found existing name by ID');
-      } catch (e) {
-        // If not found by ID, try by name and role - optimized search
-        try {
-          matchingName = box.values.firstWhere(
-            (name) => name.displayName == user.name && name.group == user.role,
-          );
-          print('✅ UserSyncBridge: Found existing name by name/role');
-        } catch (e) {
-          print('⚠️ UserSyncBridge: No existing name found, creating new one');
-          // If no matching name found, create a new one and add it
-          final newName = userToName(user);
-          await box.add(newName);
-          print('✅ UserSyncBridge: Added new name to sync system');
-          return; // Exit early since we just added a new name
+      // Send to Backend
+      final headers = await ApiConfig.headers;
+      final response = await http.put(
+        Uri.parse(ApiConfig.getUserUrl(user.id)),
+        headers: headers,
+        body: jsonEncode(user.toJson()),
+      );
+        
+        if (response.statusCode == 200) {
+          print('✅ UserSyncBridge: Updated in Backend');
+        } else {
+          print('❌ UserSyncBridge: Failed to update backend: ${response.statusCode}');
         }
-      }
-      
-      // Update the existing name (optimized - no unnecessary sync)
-      if (matchingName != null) {
-        matchingName.displayName = user.name;
-        matchingName.group = user.role;
-        matchingName.phone = user.phoneNumber;
-        matchingName.gstin = user.gstNumber;
-        
-        // Direct save without triggering full sync
-        await matchingName.save();
-        print('✅ UserSyncBridge: Updated existing name in sync system');
-        
-        // Mark as unsynced for background sync (non-blocking)
-        matchingName.synced = false;
-        await matchingName.save();
-        print('🔄 UserSyncBridge: Marked for background sync');
-      }
       
     } catch (e) {
       print('❌ UserSyncBridge: Error updating user: $e');
@@ -200,6 +211,43 @@ class UserSyncBridge {
   }
 
   // Helper methods
+  
+  /// Map app roles to backend-accepted group values
+  /// Backend accepts: 'Labour', 'Thekedaar', 'Employee', 'General', 'Sale', 'Purchase'
+  /// This is a public method so it can be used in other parts of the app
+  static String mapRoleToBackendGroup(String role) {
+    if (role.isEmpty) return 'General';
+    
+    final normalizedRole = role.toLowerCase().replaceAll(' ', '');
+    
+    switch (normalizedRole) {
+      case 'admin':
+      case 'pakkamuneem':
+      case 'kacchamuneem':
+      case 'employee':
+      case 'manager':
+      case 'muneem':
+        // Map all staff/admin roles to 'Employee' for now
+        // This keeps them separate from Labour/Sale/Purchase/General parties
+        return 'Employee';
+        
+      case 'labour':
+        return 'Labour';
+      case 'thekedaar':
+      case 'thekedar':
+        return 'Thekedaar';
+      case 'sale':
+        return 'Sale';
+      case 'purchase':
+        return 'Purchase';
+      case 'general':
+        return 'General';
+      default:
+        // Default to 'General' for unknown roles
+        return 'General';
+    }
+  }
+  
   static String _getRoleHindi(String role) {
     switch (role.toLowerCase()) {
       case 'labour':

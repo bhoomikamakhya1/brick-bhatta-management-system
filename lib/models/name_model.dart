@@ -49,13 +49,13 @@ class NameModel extends HiveObject {
 
   factory NameModel.fromJson(Map<String, dynamic> json) {
     return NameModel(
-      displayName: json['display_name'] ?? '',
+      displayName: json['display_name'] ?? json['name'] ?? '', // Handle both display_name and name
       group: json['group'] ?? '',
       phone: json['phone'],
       gstin: json['gstin'],
       commissionPercent: json['commission_percent']?.toDouble(),
       synced: true, // If coming from server, it's synced
-      serverId: json['id']?.toString(),
+      serverId: json['server_id']?.toString() ?? json['id']?.toString(), // Handle both server_id and id
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
+import '../models/labour_work_model.dart';
 import '../services/user_sync_bridge.dart';
 import '../widgets/dialog_selector.dart';
 
@@ -15,6 +16,12 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _commissionController = TextEditingController();
   final TextEditingController _salaryController = TextEditingController();
+  
+  // Purchase/Sale specific fields
+  final TextEditingController _clientNameController = TextEditingController();
+  final TextEditingController _clientNumberController = TextEditingController();
+  final TextEditingController _clientAddressController = TextEditingController();
+  final TextEditingController _clientPhoneController = TextEditingController();
 
   final List<String> _groups = ['Labour', 'Thekedaar', 'Employee', 'Sale', 'Purchase', 'General'];
   String? _selectedGroup;
@@ -22,11 +29,8 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   // Labour-specific
   String? _selectedThekedaar;
   String? _selectedLabourType;
-  final List<String> _thekedaarList = const [
-    'Sunil Thekedaar',
-    'Ramesh Thekedaar',
-    'Suresh Thekedaar',
-  ];
+  // Get thekedar list from LabourData
+  List<String> get _thekedaarList => LabourData.getThekedarNames();
   final List<String> _labourTypes = const [
     'Pathai',
     'Bharai',
@@ -46,6 +50,10 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     _nameController.dispose();
     _commissionController.dispose();
     _salaryController.dispose();
+    _clientNameController.dispose();
+    _clientNumberController.dispose();
+    _clientAddressController.dispose();
+    _clientPhoneController.dispose();
     super.dispose();
   }
 
@@ -79,6 +87,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
       
       print('📝 Creating user: $name, Group: $group, Role: $role');
       
+      // Build user model with Purchase/Sale specific fields
       final newUser = UserModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: name,
@@ -87,9 +96,45 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         roleHindi: roleHi,
         initials: initials,
         isActive: true,
+        // Add Purchase/Sale specific fields
+        contactPerson: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
+            ? _clientNameController.text.trim() 
+            : null,
+        phoneNumber: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
+            ? _clientPhoneController.text.trim() 
+            : null,
+        address: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
+            ? _clientAddressController.text.trim() 
+            : null,
+        // Store client number in gstNumber field temporarily (or add new field to model)
+        gstNumber: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
+            ? _clientNumberController.text.trim() 
+            : null,
+        partyType: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
+            ? (_selectedGroup == 'Sale' ? 'Customer' : 'Supplier')
+            : (_selectedGroup == 'Labour' && _selectedLabourType != null)
+                ? _selectedLabourType  // Store labour type (Pathai, Bharai, Nikasi) in partyType
+                : null,
       );
       
       print('👤 User model created: ${newUser.name}');
+      
+      // If Labour entry, save rate to labour rate mapping and update thekedar mapping
+      if (_selectedGroup == 'Labour') {
+        // Save rate if provided
+        if (_commissionController.text.trim().isNotEmpty) {
+          final rate = double.tryParse(_commissionController.text.trim());
+          if (rate != null && rate > 0) {
+            LabourData.setRateForLabour(name, rate);
+            print('💰 Rate ${rate} saved for labour: $name');
+          }
+        }
+        // Update thekedar mapping if thekedar is selected
+        if (_selectedThekedaar != null && _selectedThekedaar!.isNotEmpty) {
+          LabourData.setLabourThekedarMapping(name, _selectedThekedaar!);
+          print('🔗 Thekedar mapping saved: $name -> $_selectedThekedaar');
+        }
+      }
       
       // Add to both UserData and sync system
       await UserSyncBridge.addUser(newUser);
@@ -241,6 +286,11 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           _salaryController.clear();
                           _joiningDate = null;
                           _endDate = null;
+                          // Clear Purchase/Sale fields
+                          _clientNameController.clear();
+                          _clientNumberController.clear();
+                          _clientAddressController.clear();
+                          _clientPhoneController.clear();
                         });
                       },
                       validator: (_) => _selectedGroup == null ? 'Group is required' : null,
@@ -293,7 +343,7 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                       ),
 
                       const SizedBox(height: 12),
-                      _commissionField(),
+                      _rateField(),
                     ] else if (_selectedGroup == 'Thekedaar') ...[
                       const Text(
                         'Type (प्रकार)',
@@ -321,8 +371,6 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                         onChanged: (v) => setState(() => _typeNikasi = v ?? false),
                         title: const Text('Nikasi / निकासी', style: TextStyle(fontSize: 14)),
                       ),
-                      const SizedBox(height: 8),
-                      _commissionField(),
                     ] else if (_selectedGroup == 'Employee') ...[
                       const Text(
                         'Salary (वेतन)',
@@ -384,8 +432,66 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           ),
                         ),
                       ),
-                    ] else if (_selectedGroup == 'General') ...[
-                      _commissionField(),
+                    ] else if (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Client Name (क्लाइंट का नाम)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _clientNameController,
+                        decoration: _inputDecoration(hint: 'Enter client name / क्लाइंट का नाम दर्ज करें'),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Client name is required' : null,
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Client Number (क्लाइंट नंबर)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _clientNumberController,
+                        decoration: _inputDecoration(hint: 'Enter client number / क्लाइंट नंबर दर्ज करें'),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Client number is required' : null,
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Address (पता)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _clientAddressController,
+                        decoration: _inputDecoration(hint: 'Enter address / पता दर्ज करें'),
+                        maxLines: 3,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Address is required' : null,
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Phone Number (फोन नंबर)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _clientPhoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: _inputDecoration(hint: 'Enter phone number / फोन नंबर दर्ज करें'),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Phone number is required';
+                          }
+                          // Basic phone validation (10 digits)
+                          final phoneRegex = RegExp(r'^[0-9]{10}$');
+                          if (!phoneRegex.hasMatch(v.trim().replaceAll(RegExp(r'[\s-]'), ''))) {
+                            return 'Please enter a valid 10-digit phone number';
+                          }
+                          return null;
+                        },
+                      ),
                     ],
                   ],
                 ),
@@ -513,6 +619,24 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
     final mm = d.month.toString().padLeft(2, '0');
     final yyyy = d.year.toString();
     return '$dd-$mm-$yyyy';
+  }
+
+  Widget _rateField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Rate (दर)',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: _commissionController, // Reusing controller for rate
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _inputDecoration(hint: 'Enter rate / दर दर्ज करें'),
+        ),
+      ],
+    );
   }
 
   Widget _commissionField() {

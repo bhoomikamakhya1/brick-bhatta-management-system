@@ -1,13 +1,55 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import '../config/api_config.dart';
 import '../models/labour_work_model.dart';
 
 class WorkDataService {
-  static final List<LabourWork> _workEntries = [];
+  static List<LabourWork> _workEntries = [];
   static int _nextId = 1;
 
+  /// Initialize: Fetch work entries from backend
+  static Future<void> fetchWorkEntries() async {
+    try {
+      final headers = await ApiConfig.headers;
+      
+      final response = await http.get(
+        Uri.parse(ApiConfig.workUrl),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        _workEntries = data.map((json) => LabourWork.fromJson(json)).toList();
+        print('✅ Fetched ${_workEntries.length} work entries form backend');
+      } else {
+        print('❌ Failed to fetch work: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching work: $e');
+    }
+  }
+
   /// Add a new work entry
-  static void addWorkEntry(LabourWork work) {
-    _workEntries.insert(0, work); // Add to beginning of list
-    print('✅ WorkDataService: Added work entry for ${work.labourName}');
+  static Future<void> addWorkEntry(LabourWork work) async {
+    _workEntries.insert(0, work); // Optimistic UI update
+    
+    try {
+      final headers = await ApiConfig.headers;
+      final response = await http.post(
+        Uri.parse(ApiConfig.workUrl),
+        headers: headers,
+        body: jsonEncode(work.toJson()),
+      );
+        
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ WorkDataService: Added to backend');
+      } else {
+        print('❌ WorkDataService: Failed to add to backend ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ WorkDataService: Error adding to backend $e');
+    }
   }
 
   /// Get all work entries

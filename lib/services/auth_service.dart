@@ -83,6 +83,11 @@ class AuthService {
       await prefs.setBool('isAuthenticated', false);
       await prefs.remove('userId');
       await prefs.remove('verificationId');
+      await prefs.remove('userName');
+      await prefs.remove('userRole');
+      await prefs.remove('phoneNumber');
+      await prefs.remove('firebaseUid');
+      await prefs.remove('firebaseToken'); // Clear Firebase token
     } catch (e) {
       throw Exception('Sign out failed: $e');
     }
@@ -98,5 +103,23 @@ class AuthService {
   Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('userId');
+  }
+
+  // Get stored phone number
+  Future<String?> getPhoneNumber() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('phoneNumber');
+  }
+
+  // Get stored user role
+  Future<Map<String, String?>> getUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'userId': prefs.getString('userId'),
+      'userName': prefs.getString('userName'),
+      'userRole': prefs.getString('userRole'),
+      'phoneNumber': prefs.getString('phoneNumber'),
+      'firebaseUid': prefs.getString('firebaseUid'),
+    };
   }
 }
