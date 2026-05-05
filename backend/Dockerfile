@@ -10,4 +10,4 @@ COPY ./app /code/app
 # Copy Firebase key file to the backend directory (parent of app)
 COPY ./firebase-key.json /code/firebase-key.json
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

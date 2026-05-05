@@ -21,16 +21,26 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 firebase_key_path = os.path.join(BASE_DIR, "firebase-key.json")
 
 if not firebase_admin._apps:
-    if os.path.exists(firebase_key_path):
+    # Try environment variable first (best for Railway/Production)
+    firebase_json = os.getenv("FIREBASE_KEY_JSON")
+    
+    if firebase_json:
+        try:
+            cred_dict = json.loads(firebase_json)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            print("✅ Firebase initialized successfully from environment variable")
+        except Exception as e:
+            print(f"❌ Failed to initialize Firebase from environment variable: {e}")
+    elif os.path.exists(firebase_key_path):
+        # Fallback to local file
         cred = credentials.Certificate(firebase_key_path)
         firebase_admin.initialize_app(cred)
-        print("✅ Firebase initialized successfully")
+        print("✅ Firebase initialized successfully from firebase-key.json")
     else:
         # Don't block startup - Firebase is only needed for token verification
-        # OTP check endpoint doesn't need Firebase
-        print("⚠️  Firebase key not found at backend/firebase-key.json")
+        print("⚠️  Firebase key not found (no FIREBASE_KEY_JSON env or firebase-key.json file)")
         print("⚠️  Backend will start, but Firebase token verification will fail")
-        print("⚠️  This is OK for development if you're using Firebase Phone Auth on the client")
 
 
 security = HTTPBearer()
