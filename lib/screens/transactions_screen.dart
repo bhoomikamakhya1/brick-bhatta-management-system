@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'add_transaction_screen.dart';
 import 'transaction_type_selection_screen.dart';
+import 'transaction_detail_screen.dart';
 import '../models/transaction_model.dart';
 import '../services/transaction_service.dart';
 
@@ -450,7 +451,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '₹${transaction.amount.toStringAsFixed(0)}',
+              '₹${transaction.amount?.toStringAsFixed(0)}',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -484,7 +485,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ],
         ),
         onTap: () {
-          // TODO: Navigate to transaction detail
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TransactionDetailScreen(transaction: transaction),
+            ),
+          );
         },
       ),
     );

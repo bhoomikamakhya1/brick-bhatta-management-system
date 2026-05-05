@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/phone_number.dart';
 import '../models/user_model.dart';
 import '../models/labour_work_model.dart';
 import '../services/user_sync_bridge.dart';
 import '../widgets/dialog_selector.dart';
+import '../data/user_data.dart';
 
 class AddPartyScreen extends StatefulWidget {
   const AddPartyScreen({super.key});
@@ -22,8 +25,21 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
   final TextEditingController _clientNumberController = TextEditingController();
   final TextEditingController _clientAddressController = TextEditingController();
   final TextEditingController _clientPhoneController = TextEditingController();
+  PhoneNumber? _clientPhoneNumber; // Store phone number object from IntlPhoneField
 
-  final List<String> _groups = ['Labour', 'Thekedaar', 'Employee', 'Sale', 'Purchase', 'General'];
+  // Define base groups
+  final List<String> _allGroups = ['Labour', 'Thekedaar', 'Kaccha Muneem', 'Pakka Muneem', 'Employee', 'Sale', 'Purchase', 'General'];
+  
+  // Filter groups based on role
+  List<String> get _groups {
+    // Only Admin can see Muneem options
+    final role = UserData.currentUserRole ?? '';
+    if (role != 'Admin') {
+      return _allGroups.where((g) => g != 'Kaccha Muneem' && g != 'Pakka Muneem').toList();
+    }
+    return _allGroups;
+  }
+
   String? _selectedGroup;
 
   // Labour-specific
@@ -99,9 +115,12 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
         // Add Purchase/Sale specific fields
         contactPerson: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
             ? _clientNameController.text.trim() 
-            : null,
-        phoneNumber: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
-            ? _clientPhoneController.text.trim() 
+            : (_selectedGroup == 'Labour' && _selectedThekedaar != null)
+                ? _selectedThekedaar  // Store thekedaar name for labour
+                : null,
+        phoneNumber: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase' || 
+                      _selectedGroup == 'Kaccha Muneem' || _selectedGroup == 'Pakka Muneem') 
+            ? _clientPhoneNumber?.completeNumber // Use complete number with country code
             : null,
         address: (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') 
             ? _clientAddressController.text.trim() 
@@ -432,6 +451,68 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
                           ),
                         ),
                       ),
+                    ] else if (_selectedGroup == 'Kaccha Muneem' || _selectedGroup == 'Pakka Muneem') ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFF9800)),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.info_outline, color: Color(0xFFFF9800), size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'This phone number will be used for login authentication\nयह फोन नंबर लॉगिन के लिए उपयोग किया जाएगा',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF333333)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Phone Number* (फोन नंबर*)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                      ),
+                      const SizedBox(height: 6),
+                      IntlPhoneField(
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number* (फोन नंबर*)',
+                          hintText: 'Enter phone number',
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF8B4513)),
+                          ),
+                        ),
+                        initialCountryCode: 'IN',
+                        onChanged: (phone) {
+                          _clientPhoneNumber = phone;
+                        },
+                        validator: (v) {
+                          if (v == null || v.number.isEmpty) {
+                            return 'Phone number is required for login';
+                          }
+                          if (v.number.length < 10) {
+                            return 'Please enter a valid 10-digit phone number';
+                          }
+                          return null;
+                        },
+                      ),
                     ] else if (_selectedGroup == 'Sale' || _selectedGroup == 'Purchase') ...[
                       const SizedBox(height: 12),
                       const Text(
@@ -626,14 +707,14 @@ class _AddPartyScreenState extends State<AddPartyScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Rate (दर)',
+          'Rate /1000 (दर प्रति 1000)',
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: _commissionController, // Reusing controller for rate
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: _inputDecoration(hint: 'Enter rate / दर दर्ज करें'),
+          decoration: _inputDecoration(hint: 'Enter rate per 1000 / प्रति 1000 दर दर्ज करें'),
         ),
       ],
     );

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/transaction_model.dart';
+import '../services/report_service.dart';
+import '../utils/csv_export_util.dart';
+import '../utils/pdf_export_util.dart';
 
 class FinancialReportScreen extends StatefulWidget {
   const FinancialReportScreen({super.key});
@@ -8,8 +12,45 @@ class FinancialReportScreen extends StatefulWidget {
 }
 
 class _FinancialReportScreenState extends State<FinancialReportScreen> {
-  String _fromDate = '01-01-2024';
-  String _toDate = '31-12-2024';
+  String _fromDate = 'dd-mm-yyyy';
+  String _toDate = 'dd-mm-yyyy';
+  List<TransactionItem> _filteredTransactions = [];
+  Map<String, dynamic> _summary = {};
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFinancialData();
+  }
+
+  void _loadFinancialData() {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Parse dates if set
+    DateTime? startDate;
+    DateTime? endDate;
+    
+    if (_fromDate != 'dd-mm-yyyy') {
+      final parts = _fromDate.split('-');
+      startDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+    }
+    
+    if (_toDate != 'dd-mm-yyyy') {
+      final parts = _toDate.split('-');
+      endDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+    }
+
+    // Get filtered transactions
+    _filteredTransactions = ReportService.getTransactionsInDateRange(startDate, endDate);
+    _summary = ReportService.getFinancialSummary(_filteredTransactions);
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,35 +88,33 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+            icon: const Icon(Icons.download, color: Colors.white),
             onPressed: () {
-              _showReportOptions();
+              _showExportOptions();
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Filters Card
-            _buildFiltersCard(),
-            const SizedBox(height: 16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B4513)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Filters Card
+                  _buildFiltersCard(),
+                  const SizedBox(height: 16),
 
-            // Key Metrics Cards
-            _buildKeyMetricsCards(),
-            const SizedBox(height: 16),
+                  // Key Metrics Cards
+                  _buildKeyMetricsCards(),
+                  const SizedBox(height: 16),
 
-            // Income vs Expenses Chart
-            _buildChartCard(),
-            const SizedBox(height: 16),
-
-            // Export Buttons
-            _buildExportButtons(),
-            const SizedBox(height: 100), // Space for bottom navigation
-          ],
-        ),
-      ),
+                  // Transactions Table
+                  _buildTransactionsTable(),
+                  const SizedBox(height: 100), // Space for bottom navigation
+                ],
+              ),
+            ),
     );
   }
 
@@ -90,62 +129,60 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Filters / फिल्टर',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Date Range
+            const Text(
+              'Date Range / दिनांक सीमा',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'From Date / दिनांक से',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF333333),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildDateField('From', _fromDate, (value) {
-                        setState(() {
-                          _fromDate = value;
-                        });
-                      }),
-                    ],
-                  ),
+                  child: _buildDateField('From', _fromDate, (value) {
+                    setState(() {
+                      _fromDate = value;
+                    });
+                  }),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'To Date / दिनांक तक',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF333333),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildDateField('To', _toDate, (value) {
-                        setState(() {
-                          _toDate = value;
-                        });
-                      }),
-                    ],
-                  ),
+                  child: _buildDateField('To', _toDate, (value) {
+                    setState(() {
+                      _toDate = value;
+                    });
+                  }),
                 ),
               ],
             ),
             const SizedBox(height: 20),
 
-            // Apply Filter Button
+            // Apply Filters Button
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  _applyFilter();
+                  _loadFinancialData();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Filters applied successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF8B4513),
@@ -156,7 +193,7 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
                   elevation: 0,
                 ),
                 child: const Text(
-                  'Apply Filter / फ़िल्टर लगाएं',
+                  'Apply Filters / फिल्टर लगाएं',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -174,6 +211,7 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
     return TextFormField(
       readOnly: true,
       decoration: InputDecoration(
+        labelText: label,
         hintText: value,
         border: const OutlineInputBorder(),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -189,7 +227,7 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
             IconButton(
               icon: const Icon(Icons.clear, size: 20),
               onPressed: () {
-                onChanged(label == 'From' ? '01-01-2024' : '31-12-2024');
+                onChanged('dd-mm-yyyy');
               },
             ),
           ],
@@ -208,9 +246,9 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
           children: [
             Expanded(
               child: _buildMetricCard(
-                'Total Sales',
-                '₹2,45,000',
-                '+10% from last month',
+                'Total Income',
+                '₹${(_summary['totalIncome'] ?? 0.0).toStringAsFixed(0)}',
+                'Income / आय',
                 const Color(0xFF4CAF50),
                 Icons.trending_up,
               ),
@@ -218,9 +256,9 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildMetricCard(
-                'Total Expenses',
-                '₹1,85,000',
-                '-5% from last month',
+                'Total Expense',
+                '₹${(_summary['totalExpense'] ?? 0.0).toStringAsFixed(0)}',
+                'Expense / व्यय',
                 const Color(0xFFF44336),
                 Icons.trending_down,
               ),
@@ -228,36 +266,12 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildMetricCard(
-                'Total Wages',
-                '₹85,000',
-                '1,250 workers',
-                const Color(0xFFFF9800),
-                Icons.people,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildMetricCard(
-                'Commission',
-                '₹12,250',
-                '5% of sales',
-                const Color(0xFF2196F3),
-                Icons.percent,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         _buildMetricCard(
-          'Net Margin',
-          '₹60,000',
-          '24.5% profit margin',
-          const Color(0xFF4CAF50),
-          Icons.emoji_events,
+          'Net Profit',
+          '₹${(_summary['netProfit'] ?? 0.0).toStringAsFixed(0)}',
+          'Profit / लाभ',
+          const Color(0xFF2196F3),
+          Icons.account_balance,
         ),
       ],
     );
@@ -273,12 +287,22 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    subtitle,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -289,33 +313,12 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
                   Text(
                     value,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: color,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
                 ],
-              ),
-            ),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 20,
               ),
             ),
           ],
@@ -324,7 +327,31 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
     );
   }
 
-  Widget _buildChartCard() {
+  Widget _buildTransactionsTable() {
+    if (_filteredTransactions.isEmpty) {
+      return Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(
+            child: Column(
+              children: [
+                Icon(Icons.inbox, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No transactions found',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -336,7 +363,7 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Income vs Expenses / आय बनाम व्यय',
+              'Transaction Details / लेन-देन विवरण',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -344,149 +371,53 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: _buildBarChart(),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLegendItem('Income', const Color(0xFF4CAF50)),
-                const SizedBox(width: 24),
-                _buildLegendItem('Expenses', const Color(0xFFF44336)),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 20,
+                headingRowColor: MaterialStateProperty.all(Colors.grey[100]),
+                columns: const [
+                  DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Party', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+                rows: _filteredTransactions.map((txn) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(txn.date)),
+                      DataCell(Text(txn.englishName)),
+                      DataCell(Text(txn.category)),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: txn.type == TransactionType.credit
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            txn.type == TransactionType.credit ? 'Credit' : 'Debit',
+                            style: TextStyle(
+                              color: txn.type == TransactionType.credit
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      DataCell(Text('₹${txn.amount?.toStringAsFixed(2) ?? '0.00'}')),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBarChart() {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    final incomeData = [25, 35, 45, 55, 65, 75];
-    final expenseData = [20, 30, 40, 50, 60, 70];
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(months.length, (index) {
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Income bar
-            Container(
-              width: 20,
-              height: incomeData[index].toDouble(),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ),
-            const SizedBox(height: 2),
-            // Expense bar
-            Container(
-              width: 20,
-              height: expenseData[index].toDouble(),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF44336),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              months[index],
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExportButtons() {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              _exportCSV();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.file_download, size: 20),
-            label: const Text(
-              'Export CSV / CSV निर्यात करें',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              _exportPDF();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF44336),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.picture_as_pdf, size: 20),
-            label: const Text(
-              'Export PDF / PDF निर्यात करें',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -510,25 +441,16 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
     });
   }
 
-  void _applyFilter() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Filter applied successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  void _showReportOptions() {
+  void _showExportOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+      builder: (bottomSheetContext) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Report Options',
+              'Export Options',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -536,51 +458,59 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.assessment, color: Colors.blue),
-              title: const Text('Sales Report'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to sales report
+              leading: const Icon(Icons.file_download, color: Colors.green),
+              title: const Text('Export as CSV'),
+              onTap: () async {
+                Navigator.pop(bottomSheetContext);
+                // Capture context before async operation
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                try {
+                  await CsvExportUtil.exportFinancialReport(_filteredTransactions);
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('CSV exported successfully! Check Documents folder.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                } catch (e) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error exporting CSV: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
             ),
             ListTile(
-              leading: const Icon(Icons.account_balance_wallet, color: Colors.green),
-              title: const Text('Financial Report'),
-              onTap: () {
-                Navigator.pop(context);
-                // Already on financial report
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.people, color: Colors.orange),
-              title: const Text('Labour Report'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Labour Report coming soon')),
-                );
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('Export as PDF'),
+              onTap: () async {
+                Navigator.pop(bottomSheetContext);
+                // Capture context before async operation
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                try {
+                  await PdfExportUtil.exportFinancialReport(_filteredTransactions);
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('PDF exported successfully! Check Documents folder.'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                } catch (e) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error exporting PDF: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _exportCSV() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('CSV export started'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  void _exportPDF() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('PDF export started'),
-        backgroundColor: Colors.red,
       ),
     );
   }

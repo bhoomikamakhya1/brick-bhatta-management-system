@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/user_data.dart';
 import '../models/user_model.dart';
 import '../services/user_sync_bridge.dart';
@@ -18,6 +19,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
   final List<String> _filters = ['All', 'Labour', 'Thekedaar', 'Employee', 'Sale'];
   String _selectedFilter = 'All';
 
+  String? _currentUserPhone;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +39,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   Future<void> _initializeSync() async {
+    // Get current user phone for filtering
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentUserPhone = prefs.getString('userPhone') ?? '';
+    });
+
     // Sync existing users to the sync system
     await UserSyncBridge.syncUsersToNames();
     
@@ -49,7 +58,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   List<UserModel> _getFilteredUsers() {
     final query = _searchController.text.trim().toLowerCase();
-    final all = UserData.getUsers();
+    var all = UserData.getUsers();
+
+    // Filter out current user
+    if (_currentUserPhone != null && _currentUserPhone!.isNotEmpty) {
+      final currentPhone = _currentUserPhone!.replaceAll(' ', '');
+      all = all.where((u) {
+        final uPhone = (u.phoneNumber ?? '').replaceAll(' ', '');
+        return uPhone != currentPhone;
+      }).toList();
+    }
 
     final roleFiltered = _selectedFilter == 'All'
         ? all
@@ -70,7 +88,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       case 'employee':
         return 'Employee';
       case 'sale':
-        return 'Sal';
+        return 'Sale';
       default:
         return role;
     }
@@ -248,7 +266,7 @@ class _LedgerListItem extends StatelessWidget {
       case 'employee':
         return 'Employee';
       case 'sale':
-        return 'Sal';
+        return 'Sale';
       default:
         return role;
     }

@@ -10,9 +10,14 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.Name])
-def read_names(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db)):
-    names = crud.get_names(db, skip=skip, limit=limit)
+def read_names(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db), user_context: dict = Depends(dependencies.get_user_context)):
+    """
+    Get names/ledger based on user role.
+    Note: Currently ledger is shared for all users (no created_by field in Name model).
+    """
+    names = crud.get_names_for_user(db, user_context['user_id'], user_context['role'], skip=skip, limit=limit)
     return names
+
 
 @router.post("/", response_model=schemas.Name, status_code=status.HTTP_201_CREATED)
 def create_name(name: schemas.NameCreate, db: Session = Depends(dependencies.get_db)):

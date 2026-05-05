@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -8,14 +11,40 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Mock user data - in a real app, this would come from user state/API
-  final String userName = 'Rajesh Kumar';
-  final String userNameHindi = 'राजेश कुमार';
-  final String phoneNumber = '+91 9876543210';
-  final String role = 'Manager';
-  final String roleHindi = 'प्रबंधक';
-  final String bhattaId = 'BH001';
-  final String joinDate = '15 Jan 2024';
+  // User data loaded from SharedPreferences
+  String userName = '';
+  String userNameHindi = '';
+  String phoneNumber = '';
+  String role = '';
+  String roleHindi = '';
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      setState(() {
+        userName = prefs.getString('userName') ?? 'User';
+        userNameHindi = prefs.getString('userNameHindi') ?? 'उपयोगकर्ता';
+        phoneNumber = prefs.getString('userPhone') ?? '';
+        role = prefs.getString('userRole') ?? 'User';
+        roleHindi = prefs.getString('userRoleHindi') ?? 'उपयोगकर्ता';
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -60,20 +89,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Profile Information Card
-            _buildProfileCard(),
-            const SizedBox(height: 24),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Profile Information Card
+                  _buildProfileCard(),
+                  const SizedBox(height: 24),
 
-            // Action Buttons
-            _buildActionButtons(),
-            const SizedBox(height: 100), // Space for bottom navigation
-          ],
-        ),
-      ),
+                  // Action Buttons
+                  _buildActionButtons(),
+                  const SizedBox(height: 100), // Space for bottom navigation
+                ],
+              ),
+            ),
     );
   }
 
@@ -140,18 +171,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildDetailRow(
               'ROLE / भूमिका',
               '$role / $roleHindi',
-            ),
-            const SizedBox(height: 16),
-
-            _buildDetailRow(
-              'BHATTA ID / भट्टा आईडी',
-              bhattaId,
-            ),
-            const SizedBox(height: 16),
-
-            _buildDetailRow(
-              'JOIN DATE / शामिल होने की तारीख',
-              joinDate,
             ),
           ],
         ),
@@ -222,6 +241,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _showLanguageDialog();
           },
         ),
+        const SizedBox(height: 12),
+
+        // Logout Button
+        _buildActionButton(
+          icon: Icons.logout,
+          title: 'Logout',
+          titleHindi: 'लॉगआउट',
+          isPrimary: false,
+          isDestructive: true,
+          onTap: () {
+            _showLogoutDialog();
+          },
+        ),
       ],
     );
   }
@@ -231,6 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String title,
     required String titleHindi,
     required bool isPrimary,
+    bool isDestructive = false,
     required VoidCallback onTap,
   }) {
     return SizedBox(
@@ -238,9 +271,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: OutlinedButton.icon(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          foregroundColor: isPrimary ? const Color(0xFF8B4513) : const Color(0xFF666666),
+          foregroundColor: isDestructive 
+              ? Colors.red 
+              : (isPrimary ? const Color(0xFF8B4513) : const Color(0xFF666666)),
           side: BorderSide(
-            color: isPrimary ? const Color(0xFF8B4513) : Colors.grey[300]!,
+            color: isDestructive
+                ? Colors.red
+                : (isPrimary ? const Color(0xFF8B4513) : Colors.grey[300]!),
             width: 1.5,
           ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
@@ -342,26 +379,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: const Text('Logout / लॉगआउट'),
+        content: const Text('Are you sure you want to logout?\nक्या आप लॉगआउट करना चाहते हैं?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel / रद्द करें'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement logout logic
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully')),
-              );
+              await _performLogout();
             },
-            child: const Text('Logout'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Logout / लॉगआउट'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      // Sign out from Firebase
+      await FirebaseAuth.instance.signOut();
+      
+      // Clear SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      
+      // Navigate to login screen and clear navigation stack
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showAboutDialog() {

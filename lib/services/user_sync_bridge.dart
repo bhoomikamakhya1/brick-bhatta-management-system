@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../config/api_config.dart';
 import '../models/user_model.dart';
@@ -47,12 +48,33 @@ class UserSyncBridge {
   static Future<void> syncUsersToNames() async {
     final users = UserData.getUsers();
     
+    // Get current user phone to filter out (don't show self in ledger)
+    final prefs = await SharedPreferences.getInstance();
+    final currentUserPhone = prefs.getString('userPhone') ?? '';
+    final currentUserRole = prefs.getString('userRole') ?? '';
+    
+    // Set for global usage (e.g. Reports, Add Party permissions)
+    UserData.setCurrentUserPhone(currentUserPhone);
+    UserData.setCurrentUserRole(currentUserRole);
+    
+    int syncedCount = 0;
     for (var user in users) {
+      // Skip if phone matches current user
+      // Also normalize phones for comparison to be safe
+      final userPhone = (user.phoneNumber ?? '').replaceAll(' ', '');
+      final currentPhone = currentUserPhone.replaceAll(' ', '');
+      
+      if (userPhone == currentPhone && currentPhone.isNotEmpty) {
+        print('Skipping current user ${user.name} from ledger sync');
+        continue;
+      }
+
       final name = userToName(user);
       await SyncService.addName(name);
+      syncedCount++;
     }
     
-    print("🔄 Synced ${users.length} users to sync system");
+    print("🔄 Synced $syncedCount users to sync system (filtered self)");
   }
 
   /// Fetch all users from backend and populate local cache

@@ -46,23 +46,18 @@ class DashboardScreenState extends State<DashboardScreen> {
     final todaySales = SaleDataService.getSalesByDateRange(startOfDay, endOfDay);
     final salesToday = todaySales.fold(0.0, (sum, sale) => sum + sale.finalAmount);
 
-    // Calculate payables (debit transactions - expenses, salaries, purchases)
-    // For now, we'll calculate from work entries (labour payments) and purchases
-    // This is a simplified calculation - in a real app, you'd have a transaction service
-    final allWorkEntries = WorkDataService.getAllWorkEntries();
-    final payables = allWorkEntries.fold(0.0, (sum, work) => sum + work.totalAmount);
+    // Calculate today's payables (today's labour payments)
+    final todayPayables = todayWorkEntries.fold(0.0, (sum, work) => sum + work.totalAmount);
 
-    // Calculate receivables (credit transactions - sales)
-    // Sum of all sales final amounts
-    final allSales = SaleDataService.getAllSales();
-    final receivables = allSales.fold(0.0, (sum, sale) => sum + sale.finalAmount);
+    // Calculate today's receivables (today's sales)
+    final todayReceivables = todaySales.fold(0.0, (sum, sale) => sum + sale.finalAmount);
 
     setState(() {
       _stats = DashboardStats(
         labourEntries: labourEntries,
         salesToday: salesToday,
-        payables: payables,
-        receivables: receivables,
+        payables: todayPayables,
+        receivables: todayReceivables,
       );
     });
   }

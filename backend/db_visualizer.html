@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brick Bhatta DB Schema Visualizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2230;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --accent2: #f78166;
+      --accent3: #56d364;
+      --accent4: #e3b341;
+      --accent5: #bc8cff;
+      --accent6: #79c0ff;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --pk: #f78166;
+      --fk: #79c0ff;
+      --field: #56d364;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 24px 32px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #f78166 0%, #bc8cff 100%);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    h1 {
+      font-size: 1.5rem; font-weight: 700;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .subtitle { font-size: .8rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: .7rem; font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    }
+    .badge-pk { background: rgba(247,129,102,.2); color: var(--pk); }
+    .badge-fk { background: rgba(121,192,255,.2); color: var(--fk); }
+    .badge-idx { background: rgba(86,211,100,.2); color: var(--accent3); }
+    .badge-opt { background: rgba(139,148,158,.15); color: var(--text-muted); }
+
+    /* ── Canvas wrapper ── */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      overflow: auto;
+      padding: 32px;
+    }
+    #canvas {
+      position: relative;
+      width: 1480px;
+      height: 960px;
+    }
+
+    /* SVG connectors */
+    #svg-lines {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; overflow: visible;
+    }
+
+    /* ── Table cards ── */
+    .table-card {
+      position: absolute;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      min-width: 240px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,.45);
+      transition: transform .2s, box-shadow .2s;
+      cursor: default;
+    }
+    .table-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.65);
+      z-index: 10;
+    }
+
+    .table-header {
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 600; font-size: .9rem;
+    }
+    .table-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .table-name { font-family: 'JetBrains Mono', monospace; }
+    .row-count {
+      margin-left: auto;
+      font-size: .7rem; font-family: 'Inter', sans-serif;
+      color: var(--text-muted); font-weight: 400;
+    }
+
+    .table-fields { border-top: 1px solid var(--border); }
+    .field-row {
+      padding: 7px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid rgba(48,54,61,.6);
+      font-size: .78rem;
+      transition: background .15s;
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-row:hover { background: rgba(88,166,255,.06); }
+
+    .field-name {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text); flex: 1;
+    }
+    .field-type {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted); font-size: .72rem;
+    }
+    .field-badges { display: flex; gap: 4px; }
+
+    /* Colour themes per table */
+    .theme-users    .table-header { background: linear-gradient(135deg, rgba(247,129,102,.18), rgba(247,129,102,.05)); }
+    .theme-users    .table-icon   { background: rgba(247,129,102,.25); color: var(--pk); }
+    .theme-otps     .table-header { background: linear-gradient(135deg, rgba(227,179,65,.18), rgba(227,179,65,.05)); }
+    .theme-otps     .table-icon   { background: rgba(227,179,65,.25); color: var(--accent4); }
+    .theme-sales    .table-header { background: linear-gradient(135deg, rgba(88,166,255,.18), rgba(88,166,255,.05)); }
+    .theme-sales    .table-icon   { background: rgba(88,166,255,.25); color: var(--accent); }
+    .theme-brick    .table-header { background: linear-gradient(135deg, rgba(86,211,100,.18), rgba(86,211,100,.05)); }
+    .theme-brick    .table-icon   { background: rgba(86,211,100,.25); color: var(--accent3); }
+    .theme-freight  .table-header { background: linear-gradient(135deg, rgba(188,140,255,.18), rgba(188,140,255,.05)); }
+    .theme-freight  .table-icon   { background: rgba(188,140,255,.25); color: var(--accent5); }
+    .theme-work     .table-header { background: linear-gradient(135deg, rgba(121,192,255,.18), rgba(121,192,255,.05)); }
+    .theme-work     .table-icon   { background: rgba(121,192,255,.25); color: var(--accent6); }
+    .theme-trans    .table-header { background: linear-gradient(135deg, rgba(247,129,102,.14), rgba(188,140,255,.14)); }
+    .theme-trans    .table-icon   { background: rgba(188,140,255,.2); color: var(--accent5); }
+    .theme-names    .table-header { background: linear-gradient(135deg, rgba(86,211,100,.12), rgba(227,179,65,.12)); }
+    .theme-names    .table-icon   { background: rgba(227,179,65,.2); color: var(--accent4); }
+
+    /* ── Info panel ── */
+    .info-panel {
+      margin: 0 32px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .info-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+    .info-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }
+    .info-sub { font-size: .75rem; color: var(--text-muted); }
+
+    /* ── Relation labels ── */
+    .rel-label {
+      font-size: .66rem;
+      fill: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧱</div>
+    <div>
+      <h1>Brick Bhatta — DB Schema</h1>
+      <div class="subtitle">SQLite · SQLAlchemy ORM · FastAPI Backend</div>
+    </div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="badge badge-pk">PK</span> Primary Key</div>
+    <div class="legend-item"><span class="badge badge-fk">FK</span> Foreign Key</div>
+    <div class="legend-item"><span class="badge badge-idx">IDX</span> Indexed</div>
+    <div class="legend-item"><span class="badge badge-opt">?</span> Nullable</div>
+  </div>
+</header>
+
+<!-- Stats row -->
+<div class="info-panel" style="margin-top:20px;">
+  <div class="info-card">
+    <div class="info-label">Tables</div>
+    <div class="info-value" style="color:var(--accent);">8</div>
+    <div class="info-sub">SQLAlchemy Models</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Relationships</div>
+    <div class="info-value" style="color:var(--accent5);">7</div>
+    <div class="info-sub">FK Constraints</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Total Columns</div>
+    <div class="info-value" style="color:var(--accent3);">57</div>
+    <div class="info-sub">Across all tables</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Database</div>
+    <div class="info-value" style="font-size:1.1rem;color:var(--accent4);">SQLite</div>
+    <div class="info-sub">sql_app.db · local dev</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">ORM</div>
+    <div class="info-value" style="font-size:1.1rem;color:var(--pk);">SQLAlchemy</div>
+    <div class="info-sub">via FastAPI backend</div>
+  </div>
+</div>
+
+<!-- ── Canvas ── -->
+<div class="canvas-wrap">
+  <div id="canvas">
+    <svg id="svg-lines"></svg>
+
+    <!-- ══════════════ USERS ══════════════ -->
+    <div class="table-card theme-users" id="tbl-users" style="left:40px;top:60px;">
+      <div class="table-header">
+        <div class="table-icon">👤</div>
+        <span class="table-name">users</span>
+        <span class="row-count">Central entity</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">name_hindi</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">role</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">role_hindi</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">is_active</span><span class="field-type">Boolean</span></div>
+        <div class="field-row"><span class="field-name">initials</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">contact_person</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">phone_number</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-idx">IDX</span><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">address</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">party_type</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">gst_number</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">opening_balance</span><span class="field-type">Float</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">opening_balance_type</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">credit_limit</span><span class="field-type">Float</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ SALES ══════════════ -->
+    <div class="table-card theme-sales" id="tbl-sales" style="left:520px;top:40px;">
+      <div class="table-header">
+        <div class="table-icon">🧾</div>
+        <span class="table-name">sales</span>
+        <span class="row-count">FK → users</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">customer_name</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">customer_name_hindi</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">customer_address</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">customer_phone</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">date</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">time</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">advance_payment</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">total_amount</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">final_amount</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">remarks</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">otp</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">created_by</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ BRICK_ENTRIES ══════════════ -->
+    <div class="table-card theme-brick" id="tbl-brick" style="left:940px;top:40px;">
+      <div class="table-header">
+        <div class="table-icon">🧱</div>
+        <span class="table-name">brick_entries</span>
+        <span class="row-count">FK → sales</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">sale_id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span></div></div>
+        <div class="field-row"><span class="field-name">brick_type</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">quantity</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">price</span><span class="field-type">Float</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ FREIGHT_DETAILS ══════════════ -->
+    <div class="table-card theme-freight" id="tbl-freight" style="left:940px;top:280px;">
+      <div class="table-header">
+        <div class="table-icon">🚛</div>
+        <span class="table-name">freight_details</span>
+        <span class="row-count">FK → sales (1:1)</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">Integer</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">sale_id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span></div></div>
+        <div class="field-row"><span class="field-name">type</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">vehicle_number</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">vehicle_name</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">driver_name</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">driver_phone</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">rate_per_1000</span><span class="field-type">Float</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ WORK ══════════════ -->
+    <div class="table-card theme-work" id="tbl-work" style="left:40px;top:620px;">
+      <div class="table-header">
+        <div class="table-icon">⚒️</div>
+        <span class="table-name">work</span>
+        <span class="row-count">FK → users</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">labour_name</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">labour_category</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">quantity</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">percentage</span><span class="field-type">Float</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">rate</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">total_amount</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">date</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">created_by</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span><span class="badge badge-opt">?</span></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ TRANSACTIONS ══════════════ -->
+    <div class="table-card theme-trans" id="tbl-trans" style="left:520px;top:560px;">
+      <div class="table-header">
+        <div class="table-icon">💰</div>
+        <span class="table-name">transactions</span>
+        <span class="row-count">FK → users (×2)</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">party_id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">party_name</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">amount</span><span class="field-type">Float</span></div>
+        <div class="field-row"><span class="field-name">type</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">category</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">date</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">description</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">created_by</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-fk">FK</span><span class="badge badge-opt">?</span></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ OTPS ══════════════ -->
+    <div class="table-card theme-otps" id="tbl-otps" style="left:1185px;top:560px;">
+      <div class="table-header">
+        <div class="table-icon">🔐</div>
+        <span class="table-name">otps</span>
+        <span class="row-count">Standalone</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">id</span><span class="field-type">Integer</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">phone_number</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">otp_code</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">created_at</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">expires_at</span><span class="field-type">DateTime</span></div>
+        <div class="field-row"><span class="field-name">verified</span><span class="field-type">Boolean</span></div>
+        <div class="field-row"><span class="field-name">attempts</span><span class="field-type">Integer</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ NAMES ══════════════ -->
+    <div class="table-card theme-names" id="tbl-names" style="left:1185px;top:280px;">
+      <div class="table-header">
+        <div class="table-icon">📋</div>
+        <span class="table-name">names</span>
+        <span class="row-count">Standalone lookup</span>
+      </div>
+      <div class="table-fields">
+        <div class="field-row"><span class="field-name">server_id</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-pk">PK</span><span class="badge badge-idx">IDX</span></div></div>
+        <div class="field-row"><span class="field-name">name</span><span class="field-type">String</span></div>
+        <div class="field-row"><span class="field-name">value</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">group</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">phone</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">gstin</span><span class="field-type">String</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+        <div class="field-row"><span class="field-name">commission_percent</span><span class="field-type">Float</span><div class="field-badges"><span class="badge badge-opt">?</span></div></div>
+      </div>
+    </div>
+
+  </div><!-- #canvas -->
+</div><!-- .canvas-wrap -->
+
+<script>
+// Draw SVG connector lines between tables
+const svg = document.getElementById('svg-lines');
+
+function getRect(id) {
+  const el = document.getElementById(id);
+  return { left: el.offsetLeft, top: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+function midY(rect) { return rect.top + rect.h / 2; }
+function midX(rect) { return rect.left + rect.w / 2; }
+function rightX(rect) { return rect.left + rect.w; }
+
+function drawCurve(x1, y1, x2, y2, color, label) {
+  const cx = (x1 + x2) / 2;
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`);
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', '1.8');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-dasharray', '5,3');
+  path.setAttribute('opacity', '0.7');
+  svg.appendChild(path);
+
+  // Label in middle
+  if (label) {
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', cx);
+    t.setAttribute('y', (y1 + y2) / 2 - 5);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('class', 'rel-label');
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+
+  // Dot at destination
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circle.setAttribute('cx', x2);
+  circle.setAttribute('cy', y2);
+  circle.setAttribute('r', '4');
+  circle.setAttribute('fill', color);
+  circle.setAttribute('opacity', '0.85');
+  svg.appendChild(circle);
+}
+
+function drawLine(x1, y1, x2, y2, color, label) {
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  path.setAttribute('d', `M${x1},${y1} L${x2},${y2}`);
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', '1.8');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-dasharray', '5,3');
+  path.setAttribute('opacity', '0.65');
+  svg.appendChild(path);
+
+  if (label) {
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', mx);
+    t.setAttribute('y', my - 6);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('class', 'rel-label');
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+
+  const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c.setAttribute('cx', x2); c.setAttribute('cy', y2);
+  c.setAttribute('r', '4'); c.setAttribute('fill', color); c.setAttribute('opacity', '0.85');
+  svg.appendChild(c);
+}
+
+window.addEventListener('load', () => {
+  const u   = getRect('tbl-users');
+  const s   = getRect('tbl-sales');
+  const b   = getRect('tbl-brick');
+  const f   = getRect('tbl-freight');
+  const w   = getRect('tbl-work');
+  const tr  = getRect('tbl-trans');
+  // const otp = getRect('tbl-otps');
+  // const n   = getRect('tbl-names');
+
+  // users → sales  (created_by)
+  drawCurve(rightX(u), u.top + 28, s.left, s.top + 350, '#58a6ff', 'created_by');
+
+  // sales → brick_entries
+  drawCurve(rightX(s), s.top + 30, b.left, b.top + 50, '#56d364', 'sale_id');
+
+  // sales → freight_details  (1:1)
+  drawCurve(rightX(s), s.top + 100, f.left, f.top + 50, '#bc8cff', 'sale_id 1:1');
+
+  // users → work  (created_by)
+  drawCurve(u.left + 80, u.top + u.h, w.left + 80, w.top, '#79c0ff', 'created_by');
+
+  // users → transactions (party_id)
+  drawCurve(rightX(u), u.top + u.h - 60, tr.left, tr.top + 60, '#f78166', 'party_id');
+
+  // users → transactions (created_by)
+  drawCurve(rightX(u), u.top + u.h - 20, tr.left, tr.top + 200, '#e3b341', 'created_by');
+});
+</script>
+</body>
+</html>

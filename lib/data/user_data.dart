@@ -58,6 +58,24 @@ class UserData {
       ),
   ];
 
+  // Store current user phone for filtering self from lists
+  static String? _currentUserPhone;
+  
+  static void setCurrentUserPhone(String phone) {
+    _currentUserPhone = phone;
+  }
+  
+  static String? get currentUserPhone => _currentUserPhone;
+
+  // Store current user role for permission checks
+  static String? _currentUserRole;
+  
+  static void setCurrentUserRole(String role) {
+    _currentUserRole = role;
+  }
+  
+  static String? get currentUserRole => _currentUserRole;
+
   static List<UserModel> getUsers() {
     return List<UserModel>.unmodifiable(_users);
   }

@@ -189,6 +189,9 @@ class LabourData {
 
   // Get all unique thekedar names, optionally filtered by labour type
   static List<String> getThekedarNames({String? labourType}) {
+    // First, populate the mapping from UserData (database)
+    _loadThekedarMappingFromDatabase();
+    
     if (labourType == null) {
       // No filter: return all thekedars from mapping and UserData
       final thekedarUsers = UserData.getUsersByRole('Thekedaar');
@@ -218,12 +221,40 @@ class LabourData {
     print('🔍 [LabourData.getThekedarNames] Total labour users: ${labourUsers.length}');
     print('🔍 [LabourData.getThekedarNames] Labours of type $labourType: $laboursOfType');
     print('🔍 [LabourData.getThekedarNames] Mapping entries: ${_labourToThekedar.length}');
+    print('🔍 [LabourData.getThekedarNames] Mapping keys: ${_labourToThekedar.keys.toList()}');
+    print('🔍 [LabourData.getThekedarNames] Mapping values: ${_labourToThekedar.values.toList()}');
     print('🔍 [LabourData.getThekedarNames] Thekedars found: $thekedarSet');
     
     // Also include thekedars from UserData that might not be in the mapping yet
     // (For backward compatibility, include them if we have no way to filter)
     // Actually, to be safe, only return thekedars that we know have labours of this type
     return thekedarSet.toList()..sort();
+  }
+
+  // Load thekedaar mapping from database (UserData)
+  static void _loadThekedarMappingFromDatabase() {
+    // Clear existing mapping to avoid conflicts with old static data
+    _labourToThekedar.clear();
+    
+    final labourUsers = UserData.getUsersByRole('Labour');
+    int loadedCount = 0;
+    int skippedCount = 0;
+    
+    for (var user in labourUsers) {
+      // Thekedaar name is stored in contactPerson field for labour entries
+      if (user.contactPerson != null && user.contactPerson!.isNotEmpty) {
+        _labourToThekedar[user.name] = user.contactPerson!;
+        print('✅ Loaded thekedaar mapping from DB: ${user.name} -> ${user.contactPerson}');
+        loadedCount++;
+      } else {
+        print('⚠️ Labour "${user.name}" has no thekedaar assigned (contactPerson is empty)');
+        skippedCount++;
+      }
+    }
+    print('📊 Total mappings loaded: ${_labourToThekedar.length}');
+    if (skippedCount > 0) {
+      print('⚠️ $skippedCount labour(s) skipped - they need to be edited to assign a thekedaar');
+    }
   }
 
 

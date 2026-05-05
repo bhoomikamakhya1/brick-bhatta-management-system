@@ -7,6 +7,7 @@ import '../widgets/custom_dropdown.dart';
 import '../widgets/form_text_field.dart';
 import '../services/sale_data_service.dart';
 import '../services/sms_service.dart';
+import '../services/auth_service.dart';
 import 'dart:math';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   String? _selectedCategory;
   String? _selectedParty;
   String? _selectedEmployee; // For Salaries
+  String? _selectedVendor; // For Purchase
 
   // Sale form specific state
   String? _selectedCustomer; // Customer name
@@ -117,10 +119,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         .toList();
   }
 
+  // Get vendors for Purchase (from UserData with role Purchase)
+  List<UserModel> get _purchaseVendors {
+    final allUsers = UserData.getUsers();
+    return allUsers
+        .where((user) => user.role.toLowerCase() == 'purchase')
+        .toList();
+  }
+
+  List<String> get _vendorNames {
+    return _purchaseVendors.map((user) => user.name).toList();
+  }
+
   @override
   void initState() {
     super.initState();
     _dateController.text = _formatDate(DateTime.now());
+    _freightRateController.addListener(_updateCalculations);
+    _advancePaymentController.addListener(_updateCalculations);
+  }
+
+  void _updateCalculations() {
+    setState(() {});
   }
 
   @override
@@ -984,14 +1004,31 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         const SizedBox(height: 16),
 
-        // Category Input Field (Transport, Fuel, Maintenance, raw materials)
-        FormTextField(
-          label: 'Category',
-          labelHindi: 'श्रेणी',
-          hint: 'Enter category (Transport, Fuel, Maintenance, Raw Materials)',
-          hintHindi: 'श्रेणी दर्ज करें (ट्रांसपोर्ट, ईंधन, रखरखाव, कच्चा माल)',
-          controller: _purchaseCategoryController,
-        ),
+      // Vendor Name Selection
+      CustomDropdown(
+        label: 'Vendor Name',
+        labelHindi: 'विक्रेता का नाम',
+        hint: 'Select Vendor',
+        hintHindi: 'विक्रेता चुनें',
+        value: _selectedVendor,
+        items: _vendorNames,
+        onChanged: (value) {
+          setState(() {
+            _selectedVendor = value;
+          });
+        },
+      ),
+
+      const SizedBox(height: 16),
+
+      // Category Input Field (Transport, Fuel, Maintenance, raw materials)
+      FormTextField(
+        label: 'Category',
+        labelHindi: 'श्रेणी',
+        hint: 'Enter category (Transport, Fuel, Maintenance, Raw Materials)',
+        hintHindi: 'श्रेणी दर्ज करें (ट्रांसपोर्ट, ईंधन, रखरखाव, कच्चा माल)',
+        controller: _purchaseCategoryController,
+      ),
 
         const SizedBox(height: 16),
 
@@ -1137,7 +1174,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _saveTransaction() async {
     // Validate amount
-    if (_amountController.text.trim().isEmpty) {
+    if (_amountController.text.trim().isEmpty && widget.transactionType!="Sale") {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter an amount'),
@@ -1148,15 +1185,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     final amount = double.tryParse(_amountController.text.trim());
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid amount'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    // if (amount == null || amount <= 0 && widget.transactionType!="Sale") {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(
+    //       content: Text('Please enter a valid amount'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    //   return;
+    // }
 
       String hindiName;
     String englishName;
@@ -1273,8 +1310,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         finalAmount: _finalTotalAmount,
         remarks: _remarksController.text.trim().isNotEmpty ? _remarksController.text.trim() : null,
         otp: otp,
-        createdBy: 'current_user_id', // TODO: Get actual user ID
+        createdBy: await AuthService().getUserId() ?? 'unknown_user',
       );
+
 
       // Save sale entry to storage
       SaleDataService.addSale(saleEntry);
@@ -1315,8 +1353,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ),
       );
 
-      // Navigate back with the sale entry
-      Navigator.pop(context, saleEntry);
+      // Create a TransactionItem from the sale entry for the transactions list
+      final transactionItem = TransactionItem(
+        hindiName: saleEntry.customerNameHindi,
+        englishName: saleEntry.customerName,
+        amount: saleEntry.finalAmount,
+        type: TransactionType.credit, // Sales are credit (money coming in)
+        date: _dateController.text,
+        category: 'Sale',
+      );
+
+      // Navigate back with the transaction item
+      Navigator.pop(context, transactionItem);
       return;
     } else if (widget.transactionType == 'Purchase') {
       // For Purchase

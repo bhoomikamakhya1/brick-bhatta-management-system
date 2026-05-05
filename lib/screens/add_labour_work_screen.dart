@@ -65,6 +65,10 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
   // Nikasi-specific: Multiple brick entries
   List<BrickEntry> brickEntries = [];
 
+  // Bharai-specific: stock fields
+  double? bhattaStock;
+  double? kachaStock;
+
   // Get thekedar names filtered by labour type matching the form type
   List<String> get filteredThekedarNames {
     final labourType = _getLabourTypeForForm();
@@ -189,7 +193,8 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
         rate = labourRate;
         // Calculate total quantity from all brick entries
         totalQuantity = totalBrickQuantity;
-        amount = totalQuantity * rate; // Calculate amount from fetched rate
+        // Amount = (quantity / 1000) * rate  (rate is per 1000 bricks)
+        amount = (totalQuantity / 1000.0) * rate;
       });
     }
   }
@@ -376,9 +381,9 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
           
           // Total Amount
           FormTextField(
-            label: 'Total Amount',
+            label: 'Total Amount (qty/1000 \u00d7 rate)',
             labelHindi: 'कुल राशि',
-            value: '₹ ${amount.toStringAsFixed(2)}',
+            value: '\u20b9 ${amount.toStringAsFixed(2)}',
             readOnly: true,
           ),
         ],
@@ -545,6 +550,36 @@ class _AddLabourWorkScreenState extends State<AddLabourWorkScreen> {
                 quantity = qty;
               });
               _calculateTotal();
+            },
+          ),
+        ],
+        
+        // Bhatta & Kaccha Stock fields — Bharai form only
+        if (widget.workType == 'Bharai') ...[
+          const SizedBox(height: 20),
+          FormTextField(
+            label: 'Bhatta Stock (भट्ठा स्टॉक)',
+            labelHindi: 'भट्ठा स्टॉक',
+            hint: 'Enter bhatta stock quantity',
+            hintHindi: 'भट्ठा स्टॉक मात्रा दर्ज करें',
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              setState(() {
+                bhattaStock = double.tryParse(value);
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          FormTextField(
+            label: 'Kaccha Stock (कच्चा स्टॉक)',
+            labelHindi: 'कच्चा स्टॉक',
+            hint: 'Enter kaccha stock quantity',
+            hintHindi: 'कच्चा स्टॉक मात्रा दर्ज करें',
+            keyboardType: TextInputType.number,
+            onChanged: (value) {
+              setState(() {
+                kachaStock = double.tryParse(value);
+              });
             },
           ),
         ],

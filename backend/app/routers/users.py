@@ -11,9 +11,15 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db)):
-    users = crud.get_users(db, skip=skip, limit=limit)
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db), user_context: dict = Depends(dependencies.get_user_context)):
+    """
+    Get users based on role:
+    - Admin: Returns all users
+    - Kaccha/Pakka Muneem: Returns only themselves
+    """
+    users = crud.get_users_for_role(db, user_context['user_id'], user_context['role'], skip=skip, limit=limit)
     return users
+
 
 @router.post("/", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def create_user(user: schemas.UserCreate, db: Session = Depends(dependencies.get_db)):

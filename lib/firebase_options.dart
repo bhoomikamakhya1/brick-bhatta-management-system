@@ -41,49 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDe69wiKaopnCwaVmtbP5B6KN8V9ewDkaE',
-    appId: '1:319442119788:web:e0befc23b8ae7a8dffbc49',
-    messagingSenderId: '319442119788',
-    projectId: 'brick-bhatta-36052',
-    authDomain: 'brick-bhatta-36052.firebaseapp.com',
-    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
-    measurementId: 'G-FYXX4R9P53',
+    apiKey: 'AIzaSyBUrrH8qbeNyxhQ6iTGS0ypjx5GSCrlhP8',
+    appId: '1:79355426622:web:ccdd98bd5a1498afa91e6f',
+    messagingSenderId: '79355426622',
+    projectId: 'brick-bhatta-8915f',
+    authDomain: 'brick-bhatta-8915f.firebaseapp.com',
+    storageBucket: 'brick-bhatta-8915f.firebasestorage.app',
+    measurementId: 'G-LZPJE8TYWW',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD8bpoT0DNBtIC4ssu-rHt8E4T2xKkCHD4',
-    appId: '1:319442119788:android:10d5ff4595fab2e2ffbc49',
-    messagingSenderId: '319442119788',
-    projectId: 'brick-bhatta-36052',
-    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    apiKey: 'AIzaSyAnjlciCDbe482kfwnCyW6SXzZkJTh3pDY',
+    appId: '1:79355426622:android:6435c14c636f2e8ea91e6f',
+    messagingSenderId: '79355426622',
+    projectId: 'brick-bhatta-8915f',
+    storageBucket: 'brick-bhatta-8915f.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCMZON7FOFSyDU5miAY0QaWizakGFlupZ0',
-    appId: '1:319442119788:ios:1cb8b6353e0e2f8affbc49',
-    messagingSenderId: '319442119788',
-    projectId: 'brick-bhatta-36052',
-    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    apiKey: 'AIzaSyD1yNK8Z9hWIObF6BUPvgPc2Ta8npHYU4k',
+    appId: '1:79355426622:ios:96a313a02c74d02da91e6f',
+    messagingSenderId: '79355426622',
+    projectId: 'brick-bhatta-8915f',
+    storageBucket: 'brick-bhatta-8915f.firebasestorage.app',
     iosBundleId: 'com.brickbhattamanagementsystem.brickBhattaManagementSystem',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCMZON7FOFSyDU5miAY0QaWizakGFlupZ0',
-    appId: '1:319442119788:ios:1cb8b6353e0e2f8affbc49',
-    messagingSenderId: '319442119788',
-    projectId: 'brick-bhatta-36052',
-    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
+    apiKey: 'AIzaSyD1yNK8Z9hWIObF6BUPvgPc2Ta8npHYU4k',
+    appId: '1:79355426622:ios:96a313a02c74d02da91e6f',
+    messagingSenderId: '79355426622',
+    projectId: 'brick-bhatta-8915f',
+    storageBucket: 'brick-bhatta-8915f.firebasestorage.app',
     iosBundleId: 'com.brickbhattamanagementsystem.brickBhattaManagementSystem',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDe69wiKaopnCwaVmtbP5B6KN8V9ewDkaE',
-    appId: '1:319442119788:web:b14004dda49a965fffbc49',
-    messagingSenderId: '319442119788',
-    projectId: 'brick-bhatta-36052',
-    authDomain: 'brick-bhatta-36052.firebaseapp.com',
-    storageBucket: 'brick-bhatta-36052.firebasestorage.app',
-    measurementId: 'G-9640ZTQ7MY',
+    apiKey: 'AIzaSyBUrrH8qbeNyxhQ6iTGS0ypjx5GSCrlhP8',
+    appId: '1:79355426622:web:4dc27140aa67e2e2a91e6f',
+    messagingSenderId: '79355426622',
+    projectId: 'brick-bhatta-8915f',
+    authDomain: 'brick-bhatta-8915f.firebaseapp.com',
+    storageBucket: 'brick-bhatta-8915f.firebasestorage.app',
+    measurementId: 'G-SVFSZ8EFCC',
   );
 
 }

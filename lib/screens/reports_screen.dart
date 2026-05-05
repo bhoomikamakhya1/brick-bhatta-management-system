@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'sales_report_screen.dart';
 import 'financial_report_screen.dart';
+import 'labour_report_screen.dart';
+import '../services/report_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -84,8 +86,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Expanded(
               child: _buildStatCard(
                 'Total Sales',
-                '₹2,45,000',
-                '+10%',
+                '₹${ReportService.getTotalSales().toStringAsFixed(0)}',
+                '',
                 const Color(0xFF4CAF50),
                 Icons.trending_up,
               ),
@@ -94,8 +96,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Expanded(
               child: _buildStatCard(
                 'Total Expenses',
-                '₹1,85,000',
-                '-5%',
+                '₹${ReportService.getTotalExpenses().toStringAsFixed(0)}',
+                '',
                 const Color(0xFFF44336),
                 Icons.trending_down,
               ),
@@ -108,8 +110,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Expanded(
               child: _buildStatCard(
                 'Net Profit',
-                '₹60,000',
-                '+15%',
+                '₹${ReportService.getNetProfit().toStringAsFixed(0)}',
+                'Profit / लाभ',
                 const Color(0xFF4CAF50),
                 Icons.emoji_events,
               ),
@@ -117,11 +119,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                'Active Projects',
-                '12',
-                '3 new',
+                'Active Parties',
+                '${ReportService.getActivePartiesCount()}',
+                'Parties / पार्टियां',
                 const Color(0xFF2196F3),
-                Icons.work,
+                Icons.people,
               ),
             ),
           ],
@@ -224,20 +226,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           Icons.people,
           const Color(0xFFFF9800),
           () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Labour Report coming soon')),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildReportCard(
-          'Commission Report / कमीशन रिपोर्ट',
-          'Monitor commission payments and calculations',
-          Icons.percent,
-          const Color(0xFF9C27B0),
-          () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Commission Report coming soon')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LabourReportScreen()),
             );
           },
         ),

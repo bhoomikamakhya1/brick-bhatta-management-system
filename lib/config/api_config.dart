@@ -1,12 +1,30 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   // Update these with your actual FastAPI backend credentials
-  // Local Development (Android Emulator uses 10.0.2.2 to access host localhost)
-  // Using local IP for better connectivity: 192.168.1.196:8000
-  // For Android Emulator, you can also try: http://10.0.2.2:8000
-  static const String baseUrl = "http://192.168.1.107:8000";
+  // --- Dynamic Base URL Configuration ---
+  
+  // 1. Development URL (Local Network)
+  // This is used when running in Debug or Profile mode (flutter run)
+  static const String _devUrl = "http://192.168.1.196:8000";
+
+  // 2. Production URL (AWS/Cloud)
+  // This is used when building for Release (flutter build apk)
+  // You can override this at build time using: --dart-define=BASE_URL=http://...
+  static const String _prodUrl = String.fromEnvironment(
+    'BASE_URL',
+    defaultValue: "http://15.207.111.174:8000",
+   );
+
+  // Dynamic Base URL getter
+  static String get baseUrl {
+    if (kReleaseMode) {
+      return _prodUrl;
+    }
+    return _devUrl;
+  }
   static const String apiKey = "brick_bhatta_123"; 
   static const String tenantId = "kiln-001"; 
   

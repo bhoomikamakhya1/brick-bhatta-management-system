@@ -11,9 +11,15 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.Sale])
-def read_sales(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db)):
-    sales = crud.get_sales(db, skip=skip, limit=limit)
+def read_sales(skip: int = 0, limit: int = 100, db: Session = Depends(dependencies.get_db), user_context: dict = Depends(dependencies.get_user_context)):
+    """
+    Get sales based on user role:
+    - Admin: Returns all sales
+    - Kaccha/Pakka Muneem: Returns only sales created by this user
+    """
+    sales = crud.get_sales_for_user(db, user_context['user_id'], user_context['role'], skip=skip, limit=limit)
     return sales
+
 
 @router.post("/", response_model=schemas.Sale, status_code=status.HTTP_201_CREATED)
 def create_sale(sale: schemas.SaleCreate, db: Session = Depends(dependencies.get_db)):

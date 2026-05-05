@@ -7,7 +7,7 @@ class TransactionItem {
   final String? id; // Optional ID from backend
   final String hindiName;
   final String englishName;
-  final double amount;
+  final double? amount;
   final TransactionType type;
   final String date;
   final String category;

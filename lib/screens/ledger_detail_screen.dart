@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
+import '../models/labour_work_model.dart';
 import '../services/user_sync_bridge.dart';
 
 class LedgerDetailScreen extends StatefulWidget {
@@ -20,21 +21,6 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
     user = widget.user;
   }
 
-  Color _roleColor(String role) {
-    switch (role.toLowerCase()) {
-      case 'labour':
-        return const Color(0xFF2196F3);
-      case 'thekedaar':
-        return const Color(0xFFFF9800);
-      case 'employee':
-        return const Color(0xFF9C27B0);
-      case 'sale':
-        return const Color(0xFF4CAF50);
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,7 +31,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Ledger Detail',
+          'Ledger Detail / खाता विवरण',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -53,7 +39,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFFFF6F00),
+        backgroundColor: const Color(0xFF8B4513),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -64,32 +50,56 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
             _headerCard(),
             const SizedBox(height: 16),
             _infoSection(
-              title: 'Basic Information',
+              title: 'Basic Information / मूल जानकारी',
               children: [
-                _readonlyField('Group / समूह', _getGroupName()),
-                _readonlyField('Status / स्थिति', user.isActive ? 'सक्रिय (Active)' : 'निष्क्रिय (Inactive)', 
-                    valueColor: user.isActive ? const Color(0xFF4CAF50) : const Color(0xFFF44336)),
-                _readonlyField('Type / प्रकार', _getTypeDisplay()),
+                _readonlyField('Party Name / पार्टी नाम', user.name),
+                _readonlyField('Name (Hindi) / हिंदी नाम', user.nameHindi),
+                _readonlyField('Role / भूमिका', user.role),
+                _readonlyField(
+                  'Status / स्थिति',
+                  user.isActive ? 'Active / सक्रिय' : 'Inactive / निष्क्रिय',
+                  valueColor: user.isActive ? const Color(0xFF4CAF50) : const Color(0xFFF44336),
+                ),
               ],
             ),
             const SizedBox(height: 16),
             _infoSection(
-              title: 'Payment Details',
+              title: 'Contact Information / संपर्क जानकारी',
               children: [
-                _readonlyField('Commission Rate / कमीशन दर', '₹15 per 1000 bricks', 
-                    valueColor: const Color(0xFFF44336)),
-                _readonlyField('Total Earned / कुल कमाई', '₹12,450', 
-                    valueColor: const Color(0xFF4CAF50)),
-                _readonlyField('Pending Amount / बकाया राशि', '₹2,300', 
-                    valueColor: const Color(0xFFF44336)),
+                _readonlyField('Contact Person / संपर्क व्यक्ति', user.contactPerson ?? '—'),
+                _readonlyField('Phone Number / फोन नंबर', user.phoneNumber ?? '—'),
+                _readonlyField('Address / पता', user.address ?? '—'),
               ],
             ),
             const SizedBox(height: 16),
             _infoSection(
-              title: 'Date Information',
+              title: 'Party Details / पार्टी विवरण',
               children: [
-                _readonlyField('Join Date / शामिल होने की तारीख', '15 Jan 2024'),
-                _readonlyField('Last Payment / अंतिम भुगतान', '28 Feb 2024'),
+                _readonlyField('Party Type / पार्टी प्रकार', user.partyType ?? '—'),
+                _readonlyField('GST Number / जीएसटी नंबर', user.gstNumber ?? '—'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _infoSection(
+              title: 'Financial Information / वित्तीय जानकारी',
+              children: [
+                _readonlyField(
+                  'Opening Balance / प्रारंभिक शेष',
+                  user.openingBalance != null
+                      ? '\u20b9${user.openingBalance!.toStringAsFixed(0)} ${user.openingBalanceType ?? 'Cr'}'
+                      : '—',
+                  valueColor: user.openingBalanceType == 'Dr' ? const Color(0xFFF44336) : const Color(0xFF4CAF50),
+                ),
+                _readonlyField(
+                  'Credit Limit / क्रेडिट लिमिट',
+                  user.creditLimit != null ? '\u20b9${user.creditLimit!.toStringAsFixed(0)}' : '—',
+                ),
+                if (user.role.toLowerCase() == 'labour')
+                  _readonlyField(
+                    'Rate /1000 (दर प्रति 1000)',
+                    '\u20b9${LabourData.getRateForLabour(user.name).toStringAsFixed(2)}',
+                    valueColor: const Color(0xFF8B4513),
+                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -103,29 +113,50 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
   Widget _headerCard() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 0),
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(
-              Icons.person,
-              size: 32,
-              color: Color(0xFF666666),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B4513).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Center(
+                child: Text(
+                  user.initials,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B4513),
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     user.nameHindi,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                    ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     user.name,
-                    style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
+                    ),
                   ),
                 ],
               ),
@@ -154,6 +185,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
   Widget _infoSection({required String title, required List<Widget> children}) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 0),
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -162,9 +194,13 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF333333),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ...children,
           ],
         ),
@@ -174,57 +210,39 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
 
   Widget _readonlyField(String label, String value, {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666)),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF666666),
+            ),
           ),
           const SizedBox(height: 6),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE0E0E0)),
             ),
-            child: Text(value.isEmpty ? '—' : value,
-                style: TextStyle(fontSize: 14, color: valueColor ?? const Color(0xFF333333))),
+            child: Text(
+              value.isEmpty ? '—' : value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: valueColor ?? const Color(0xFF333333),
+              ),
+            ),
           ),
         ],
       ),
     );
-  }
-
-  String _getGroupName() {
-    switch (user.role.toLowerCase()) {
-      case 'labour':
-        return 'मजदूर ग्रुप A';
-      case 'thekedaar':
-        return 'ठेकेदार ग्रुप B';
-      case 'employee':
-        return 'कर्मचारी ग्रुप C';
-      case 'sale':
-        return 'बिक्री ग्रुप D';
-      default:
-        return '${user.role} Group';
-    }
-  }
-
-  String _getTypeDisplay() {
-    switch (user.role.toLowerCase()) {
-      case 'labour':
-      case 'thekedaar':
-        return 'Commission Based';
-      case 'employee':
-        return 'Salary Based';
-      case 'sale':
-        return 'Commission Based';
-      default:
-        return 'General';
-    }
   }
 
   Widget _actionButtons() {
@@ -248,7 +266,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
                     context: context,
                     barrierDismissible: false,
                     builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
+                      child: CircularProgressIndicator(color: Color(0xFF8B4513)),
                     ),
                   );
 
@@ -267,7 +285,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('${result.name} details updated successfully'),
+                        content: Text('${result.name} updated successfully'),
                         backgroundColor: const Color(0xFF4CAF50),
                         duration: const Duration(seconds: 2),
                       ),
@@ -295,26 +313,29 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6F00),
+              backgroundColor: const Color(0xFF8B4513),
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             icon: const Icon(Icons.edit, size: 18),
-            label: const Text('Edit Details / विवरण संपादित करें'),
+            label: const Text(
+              'Edit Details / विवरण संपादित करें',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           height: 48,
-          child: ElevatedButton.icon(
+          child: OutlinedButton.icon(
             onPressed: () async {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Delete Party'),
-                  content: Text('Are you sure you want to delete ${user.name}?\n\nThis action cannot be undone.'),
+                  content: Text('Are you sure you want to delete ${user.name}?\\n\\nThis action cannot be undone.'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -335,7 +356,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
                     context: context,
                     barrierDismissible: false,
                     builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
+                      child: CircularProgressIndicator(color: Color(0xFF8B4513)),
                     ),
                   );
 
@@ -376,14 +397,16 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD32F2F),
-              foregroundColor: Colors.white,
-              elevation: 0,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF44336),
+              side: const BorderSide(color: Color(0xFFF44336)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             icon: const Icon(Icons.delete, size: 18),
-            label: const Text('Delete / हटाएं'),
+            label: const Text(
+              'Delete / हटाएं',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ],
@@ -405,17 +428,17 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
   late TextEditingController _nameHindiController;
   late String _role;
   bool _isActive = true;
-  // Extra fields
   late TextEditingController _contactPersonController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
-  late String _partyType; // Customer / Supplier
+  late String _partyType;
   late TextEditingController _gstController;
   late TextEditingController _openingBalanceController;
   String _openingBalanceType = 'Cr';
   late TextEditingController _creditLimitController;
+  late TextEditingController _rateController;
 
-  final List<String> _roles = const ['Labour', 'Thekedaar', 'Employee', 'Sale', 'Supervisor', 'Worker', 'Manager', 'General'];
+  final List<String> _roles = const ['Labour', 'Thekedaar', 'Employee', 'Sale', 'Purchase', 'Supervisor', 'Worker', 'Manager', 'General'];
 
   @override
   void initState() {
@@ -432,6 +455,8 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
     _openingBalanceController = TextEditingController(text: widget.user.openingBalance?.toStringAsFixed(0) ?? '');
     _openingBalanceType = widget.user.openingBalanceType ?? 'Cr';
     _creditLimitController = TextEditingController(text: widget.user.creditLimit?.toStringAsFixed(0) ?? '');
+    final existingRate = LabourData.getRateForLabour(widget.user.name);
+    _rateController = TextEditingController(text: widget.user.role.toLowerCase() == 'labour' ? existingRate.toStringAsFixed(2) : '');
   }
 
   @override
@@ -444,11 +469,22 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
     _gstController.dispose();
     _openingBalanceController.dispose();
     _creditLimitController.dispose();
+    _rateController.dispose();
     super.dispose();
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
+    final name = _nameController.text.trim();
+    if (_role.toLowerCase() == 'labour') {
+      final rateText = _rateController.text.trim();
+      if (rateText.isNotEmpty) {
+        final rate = double.tryParse(rateText);
+        if (rate != null && rate > 0) {
+          LabourData.setRateForLabour(name, rate);
+        }
+      }
+    }
     final updated = UserModel(
       id: widget.user.id,
       name: _nameController.text.trim(),
@@ -466,20 +502,11 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
       openingBalanceType: _openingBalanceType,
       creditLimit: _creditLimitController.text.trim().isEmpty ? null : double.tryParse(_creditLimitController.text.trim()),
     );
-    // Update store
-    // ignore: avoid_print
-    // print('Updating user: ${updated.toJson()}');
-    // Use UserData to persist
-    // Placed here to avoid a circular import at top-level
-    // ignore: unnecessary_import
-    // ignore: depend_on_referenced_packages
-    // This import local is avoided; call via a callback
-    // We'll use a Navigator pop with result and let caller refresh
     Navigator.of(context).pop(updated);
   }
 
   String _computeInitials(String name) {
-    final parts = name.trim().split(RegExp(r"\s+"));
+    final parts = name.trim().split(RegExp(r"\\s+"));
     if (parts.isEmpty) return 'NA';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
@@ -489,9 +516,17 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
-          'Edit Party',
-          style: TextStyle(color: Colors.white),
+          'Edit Party / पार्टी संपादित करें',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFF8B4513),
         centerTitle: true,
@@ -499,8 +534,9 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
       ),
       backgroundColor: const Color(0xFFF5F5F5),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Card(
+          elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -509,105 +545,172 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Party Name / पार्टी नाम', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Text('Party Name / पार्टी नाम', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _nameController,
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text('Name (Hindi) / हिंदी नाम', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  const Text('Name (Hindi) / हिंदी नाम', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _nameHindiController,
-                    decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
                   ),
-                const SizedBox(height: 12),
-                const Text('Contact Person / संपर्क व्यक्ति', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _contactPersonController,
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                const Text('Phone Number / फोन नंबर', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                const Text('Address / पता', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _addressController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                  const SizedBox(height: 12),
-                const Text('Party Type / पार्टी प्रकार', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  const Text('Contact Person / संपर्क व्यक्ति', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
                   const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: _partyType,
-                  items: const [
-                    DropdownMenuItem<String>(value: 'Customer', child: Text('Customer / ग्राहक')),
-                    DropdownMenuItem<String>(value: 'Supplier', child: Text('Supplier / सप्लायर')),
-                  ],
-                  onChanged: (v) => setState(() => _partyType = v ?? _partyType),
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                const Text('GST Number / जीएसटी नंबर', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _gstController,
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                const Text('Opening Balance / प्रारंभिक शेष', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _openingBalanceController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                  TextFormField(
+                    controller: _contactPersonController,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Phone Number / फोन नंबर', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Address / पता', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _addressController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Party Type / पार्टी प्रकार', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: _partyType,
+                    items: const [
+                      DropdownMenuItem<String>(value: 'Customer', child: Text('Customer / ग्राहक')),
+                      DropdownMenuItem<String>(value: 'Supplier', child: Text('Supplier / सप्लायर')),
+                    ],
+                    onChanged: (v) => setState(() => _partyType = v ?? _partyType),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('GST Number / जीएसटी नंबर', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _gstController,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Opening Balance / प्रारंभिक शेष', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _openingBalanceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 80,
+                        child: DropdownButtonFormField<String>(
+                          value: _openingBalanceType,
+                          items: const [
+                            DropdownMenuItem<String>(value: 'Dr', child: Text('Dr')),
+                            DropdownMenuItem<String>(value: 'Cr', child: Text('Cr')),
+                          ],
+                          onChanged: (v) => setState(() => _openingBalanceType = v ?? _openingBalanceType),
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Credit Limit / क्रेडिट लिमिट', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _creditLimitController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  if (_role.toLowerCase() == 'labour') ...[
+                    const SizedBox(height: 16),
+                    const Text('Rate /1000 (दर प्रति 1000)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _rateController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        hintText: 'Enter rate per 1000 bricks',
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 80,
-                      child: DropdownButtonFormField<String>(
-                        value: _openingBalanceType,
-                        items: const [
-                          DropdownMenuItem<String>(value: 'Dr', child: Text('Dr')),
-                          DropdownMenuItem<String>(value: 'Cr', child: Text('Cr')),
-                        ],
-                        onChanged: (v) => setState(() => _openingBalanceType = v ?? _openingBalanceType),
-                        decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                      ),
-                    ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Credit Limit / क्रेडिट लिमिट', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _creditLimitController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
-                ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   SwitchListTile(
-                    title: const Text('Active'),
+                    title: const Text('Active / सक्रिय'),
                     value: _isActive,
                     onChanged: (v) => setState(() => _isActive = v),
                     contentPadding: EdgeInsets.zero,
+                    activeColor: const Color(0xFF8B4513),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -619,16 +722,27 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: const Text('Update Party / पार्टी अपडेट करें'),
+                      child: const Text(
+                        'Update Party / पार्टी अपडेट करें',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel / रद्द करें'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF8B4513),
+                        side: const BorderSide(color: Color(0xFF8B4513)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'Cancel / रद्द करें',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -640,5 +754,3 @@ class _EditPartyScreenState extends State<_EditPartyScreen> {
     );
   }
 }
-
-

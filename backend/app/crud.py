@@ -6,12 +6,58 @@ from datetime import datetime, timedelta
 import secrets
 import hashlib
 
+# --- User CRUD ---
+def get_users_for_role(db: Session, user_id: str, role: str, skip: int = 0, limit: int = 100):
+    """
+    Get users based on role:
+    - Admin: Returns all users
+    - Kaccha/Pakka Muneem: Returns only the current user (themselves)
+    """
+    query = db.query(models.User)
+    
+    # Admin sees all users
+    if role == "Admin":
+        return query.offset(skip).limit(limit).all()
+    
+    # Muneems only see themselves
+    return query.filter(models.User.id == user_id).offset(skip).limit(limit).all()
+
 # --- Name CRUD ---
 def get_name(db: Session, server_id: str):
     return db.query(models.Name).filter(models.Name.server_id == server_id).first()
 
 def get_names(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Name).offset(skip).limit(limit).all()
+
+def get_names_for_user(db: Session, user_id: str, role: str, skip: int = 0, limit: int = 100):
+    """
+    Get names based on user role:
+    - Admin: Returns all names EXCEPT Admin itself
+    - Kaccha/Pakka Muneem: Returns ONLY names they created (starts with clean slate)
+    """
+    query = db.query(models.Name)
+    
+    # Admin sees everything except themselves
+    if role == "Admin":
+        # Filter out Admin user from ledger
+        admin_users = db.query(models.User).filter(models.User.role == "Admin").all()
+        admin_phones = [u.phone_number for u in admin_users if u.phone_number]
+        
+        if admin_phones:
+            query = query.filter(~models.Name.phone.in_(admin_phones))
+        
+        return query.offset(skip).limit(limit).all()
+    
+    # For Muneems, only show names they created (if Name has created_by field)
+    # This means they start with a clean ledger
+    if hasattr(models.Name, 'created_by'):
+        return query.filter(models.Name.created_by == user_id).offset(skip).limit(limit).all()
+    else:
+        # If no created_by field, return empty list for Muneems (clean slate)
+        # They will create their own ledger entries
+        return []
+
+
 
 def create_name(db: Session, name: schemas.NameCreate):
     # Map display_name to name if needed
@@ -34,6 +80,33 @@ def create_name(db: Session, name: schemas.NameCreate):
         commission_percent=name.commission_percent
     )
     db.add(db_name)
+    
+    # AUTO-CREATE USER: If this is a Kaccha/Pakka Muneem with phone number, also create user account
+    if name.group in ["Kaccha Muneem", "Pakka Muneem"] and name.phone:
+        # Check if user already exists
+        existing_user = get_user_by_phone(db, name.phone)
+        
+        if not existing_user:
+            # Create new user for authentication
+            user_id = str(uuid.uuid4())
+            role_hindi = "कच्चा मुनीम" if name.group == "Kaccha Muneem" else "पक्का मुनीम"
+            
+            # Get initials from name
+            initials = name_value.strip()[0:2].upper() if len(name_value.strip()) >= 2 else name_value.strip()[0].upper()
+            
+            db_user = models.User(
+                id=user_id,
+                name=name_value.strip(),
+                name_hindi=name_value.strip(),  # Can be enhanced with actual Hindi name if provided
+                role=name.group,
+                role_hindi=role_hindi,
+                initials=initials,
+                phone_number=name.phone,
+                is_active=True
+            )
+            db.add(db_user)
+            print(f"✅ Auto-created user account for {name.group}: {name_value.strip()} ({name.phone})")
+    
     try:
         db.commit()
         db.refresh(db_name)
@@ -53,6 +126,22 @@ def get_work(db: Session, work_id: str):
 
 def get_works(db: Session, skip: int = 0, limit: int = 1000): # Increased limit for sync
     return db.query(models.Work).order_by(models.Work.date.desc()).offset(skip).limit(limit).all()
+
+def get_works_for_user(db: Session, user_id: str, role: str, skip: int = 0, limit: int = 1000):
+    """
+    Get work entries based on user role:
+    - Admin: Returns all work entries
+    - Kaccha/Pakka Muneem: Returns only work entries created by this user
+    """
+    query = db.query(models.Work)
+    
+    # Admin sees everything
+    if role == "Admin":
+        return query.order_by(models.Work.date.desc()).offset(skip).limit(limit).all()
+    
+    # Muneems see only their own data
+    return query.filter(models.Work.created_by == user_id).order_by(models.Work.date.desc()).offset(skip).limit(limit).all()
+
 
 def create_work(db: Session, work: schemas.WorkCreate, user_id: str):
     # Use provided ID or generate DB logic one (though UUID is preferred for sync)
@@ -89,6 +178,22 @@ def get_transaction(db: Session, transaction_id: str):
 
 def get_transactions(db: Session, skip: int = 0, limit: int = 1000):
     return db.query(models.Transaction).order_by(models.Transaction.date.desc()).offset(skip).limit(limit).all()
+
+def get_transactions_for_user(db: Session, user_id: str, role: str, skip: int = 0, limit: int = 1000):
+    """
+    Get transactions based on user role:
+    - Admin: Returns all transactions
+    - Kaccha/Pakka Muneem: Returns only transactions created by this user
+    """
+    query = db.query(models.Transaction)
+    
+    # Admin sees everything
+    if role == "Admin":
+        return query.order_by(models.Transaction.date.desc()).offset(skip).limit(limit).all()
+    
+    # Muneems see only their own data
+    return query.filter(models.Transaction.created_by == user_id).order_by(models.Transaction.date.desc()).offset(skip).limit(limit).all()
+
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate, user_id: str):
     # Check if user exists in database (user_id might be Firebase UID)
@@ -147,6 +252,7 @@ def get_user(db: Session, user_id: str):
 def get_user_by_phone(db: Session, phone_number: str):
     """
     Get user by phone number, tolerant to formatting differences.
+    Checks both User table and Name table (for Kaccha/Pakka Muneem).
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -170,17 +276,44 @@ def get_user_by_phone(db: Session, phone_number: str):
     logger.error(f"[DEBUG] get_user_by_phone input: '{phone_number}'")
     logger.error(f"[DEBUG] normalized candidates: {candidates}")
 
+    # First check User table
     user = db.query(models.User).filter(
         models.User.phone_number.in_(candidates)
     ).first()
 
-    if not user:
-        all_users = db.query(models.User).all()
-        logger.error(f"[DEBUG] No match. Users in DB:")
-        for u in all_users:
-            logger.error(f"  id={u.id}, phone='{u.phone_number}'")
+    if user:
+        logger.error(f"[DEBUG] Found user in User table: {user.id}")
+        return user
 
-    return user
+    # If not found in User table, check Name table for Kaccha/Pakka Muneem
+    name = db.query(models.Name).filter(
+        models.Name.phone.in_(candidates)
+    ).first()
+
+    if name:
+        logger.error(f"[DEBUG] Found user in Name table: {name.server_id}, role: {name.group}")
+        # Convert Name to User-like object for compatibility
+        # Create a temporary User object with Name data
+        user_obj = models.User(
+            id=name.server_id,
+            name=name.name,
+            phone_number=name.phone,
+            role=name.group,  # group field contains the role (Kaccha Muneem, Pakka Muneem, etc.)
+            is_active=True
+        )
+        return user_obj
+
+    # Not found in either table
+    all_users = db.query(models.User).all()
+    all_names = db.query(models.Name).all()
+    logger.error(f"[DEBUG] No match. Users in DB: {len(all_users)}, Names in DB: {len(all_names)}")
+    for u in all_users:
+        logger.error(f"  User: id={u.id}, phone='{u.phone_number}'")
+    for n in all_names:
+        logger.error(f"  Name: id={n.server_id}, phone='{n.phone}', group='{n.group}'")
+
+    return None
+
 
 
 def get_users(db: Session, skip: int = 0, limit: int = 100):
@@ -308,6 +441,22 @@ def get_sale(db: Session, sale_id: str):
 
 def get_sales(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Sale).offset(skip).limit(limit).all()
+
+def get_sales_for_user(db: Session, user_id: str, role: str, skip: int = 0, limit: int = 100):
+    """
+    Get sales based on user role:
+    - Admin: Returns all sales
+    - Kaccha/Pakka Muneem: Returns only sales created by this user
+    """
+    query = db.query(models.Sale)
+    
+    # Admin sees everything
+    if role == "Admin":
+        return query.offset(skip).limit(limit).all()
+    
+    # Muneems see only their own data
+    return query.filter(models.Sale.created_by == user_id).offset(skip).limit(limit).all()
+
 
 def create_sale(db: Session, sale: schemas.SaleCreate):
     # Generate ID if not provided

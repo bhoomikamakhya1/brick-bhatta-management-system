@@ -73,3 +73,29 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+def get_user_context(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Get user context including role from database.
+    Returns dict with user_id and role.
+    Checks both Users table and Names table (for Kaccha/Pakka Muneem).
+    """
+    from . import crud
+    
+    firebase_uid = current_user.get('uid')
+    
+    # Try to find user in Users table by Firebase UID
+    user = crud.get_user(db, firebase_uid)
+    if user:
+        return {"user_id": user.id, "role": user.role, "name": user.name}
+    
+    # If not in Users table, try to find by phone number in Names table
+    phone = current_user.get('phone_number')
+    if phone:
+        user = crud.get_user_by_phone(db, phone)
+        if user:
+            return {"user_id": user.id, "role": user.role, "name": user.name}
+    
+    # Default to a basic user context (shouldn't happen if auth is working)
+    return {"user_id": firebase_uid, "role": "User", "name": "Unknown"}
+

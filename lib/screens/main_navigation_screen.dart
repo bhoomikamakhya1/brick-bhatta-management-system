@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sale_data_service.dart';
 import '../services/user_sync_bridge.dart';
 import '../services/work_data_service.dart';
+import '../data/user_data.dart';
 import 'dashboard_screen.dart' show DashboardScreen, DashboardScreenState;
 import 'ledger_screen.dart';
 import 'transactions_screen.dart';
@@ -29,6 +31,18 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   Future<void> _loadData() async {
+    // Load user data from SharedPreferences first
+    final prefs = await SharedPreferences.getInstance();
+    final userRole = prefs.getString('userRole') ?? '';
+    final userPhone = prefs.getString('userPhone') ?? '';
+    
+    // Set in UserData for global access
+    UserData.setCurrentUserRole(userRole);
+    UserData.setCurrentUserPhone(userPhone);
+    
+    print('✅ [MAIN] User role loaded: $userRole');
+    print('✅ [MAIN] User phone loaded: $userPhone');
+    
     // Fetch data from backend on startup
     await Future.wait([
       SaleDataService.fetchSales(),
